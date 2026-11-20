@@ -53,29 +53,31 @@ const CSS = `
 .md-line input.md-blank.bad { color: #dc2626; background: rgba(239, 68, 68, .09); border-bottom-color: #ef4444; }
 .md-line input.md-blank.hinted { color: #c2410c; border-bottom-color: #fb923c; }
 .md-line input.md-blank.rev { color: #b91c1c; font-style: italic; border-bottom-style: dotted; background: transparent; }
-.md-line .md-measure { position: absolute; visibility: hidden; white-space: pre; pointer-events: none; left: 0; top: 0; }
-.md-line .md-measure.rev { font-style: italic; }
 .md-line .md-mark { margin-left: 6px; font-size: 12px; color: #15803d; font-weight: 700; }
 `;
 
 /**
- * Width of text as the page really draws it: a hidden copy inside the same
- * line, so it picks up the site's font, letter-spacing and font features
- * (a canvas measurement misses those and comes out short).
+ * Width of text in the transcript's font, measured on a canvas. Measuring a
+ * hidden copy in the page would be exact, but each read forces the browser to
+ * lay out the whole page, and a long Loom transcript has thousands of blanks:
+ * that froze the tab. The canvas uses the same font and letter-spacing, and a
+ * blank and what is typed in it are measured the same way, so the spare room
+ * below keeps the width steady while typing.
  */
+let pen: { ctx: CanvasRenderingContext2D; plain: string; italic: string; spacing: string } | null = null;
+
 function textWidth(input: HTMLInputElement, text: string): number {
-  const line = input.parentElement;
-  if (!line || !text) return 0;
-  let probe = line.querySelector<HTMLElement>(':scope > .md-measure');
-  if (!probe) {
-    probe = document.createElement('span');
-    probe.className = 'md-measure';
-    probe.setAttribute('aria-hidden', 'true');
-    line.append(probe);
+  if (!text) return 0;
+  if (!pen) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return text.length * 8;
+    const cs = getComputedStyle(input);
+    const rest = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    pen = { ctx, plain: `${cs.fontStyle === 'italic' ? 'normal' : cs.fontStyle} ${rest}`, italic: `italic ${rest}`, spacing: cs.letterSpacing };
+    (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = pen.spacing === 'normal' ? '0px' : pen.spacing;
   }
-  probe.classList.toggle('rev', input.classList.contains('rev'));
-  probe.textContent = text;
-  return probe.getBoundingClientRect().width;
+  pen.ctx.font = input.classList.contains('rev') ? pen.italic : pen.plain;
+  return pen.ctx.measureText(text).width;
 }
 
 /**
@@ -120,12 +122,15 @@ export class InlineBlanks {
       style.textContent = CSS;
       (document.head || document.documentElement).appendChild(style);
     }
+    pen = null; // the site's font may differ from the last page
     this.lines = lines;
     this.parts = lines.map((l) => blankParts(l.text));
     this.blankSlots = lines.map((_, i) => this.pickBlanks(i));
     this.nodes = lines.map(() => null);
     lines.forEach((_, i) => this.render(i));
-    this.observer = new MutationObserver(() => {
+    this.observer = new MutationObserver((records) => {
+      // Our own lines changing (typing, colours) is not the site re-rendering.
+      if (records.every((r) => (r.target as Element).closest?.('.md-line'))) return;
       clearTimeout(this.repairTimer);
       this.repairTimer = window.setTimeout(() => this.repair(), 250);
     });
