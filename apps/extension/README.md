@@ -34,7 +34,9 @@ row of blanks, one per spoken word, and you type straight into them as on
 WELE's podcast page. Speaker names, punctuation and "uh" / "um" stay visible.
 A word turns green as soon as it is right; <kbd>Enter</kbd> checks the line and
 marks the wrong ones red. A word given by a hint completes the line but does not
-score. Turn it off with **Type in the transcript** in the panel to use the text
+score. **Blanks 100% / 75% / 50% / 25%** in the panel leaves that share of the
+words as blanks and shows the rest; which words is fixed per line, every line
+keeps at least one blank, and nothing typed is lost when you change it. Turn it off with **Type in the transcript** in the panel to use the text
 box below instead; the choice is remembered.
 
 | Key | Action |

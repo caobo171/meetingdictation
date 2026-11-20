@@ -39,9 +39,10 @@ const STYLE_ID = 'meetingdictation-blanks';
 const CSS = `
 [data-md-src] { display: none !important; }
 .md-line { display: block; line-height: 2.05; filter: none !important; user-select: text; cursor: text; }
-.md-line.md-cur { background: rgba(79, 70, 229, .07); box-shadow: -3px 0 0 #6366f1; border-radius: 4px; }
+.md-line.md-cur { background: rgba(79, 70, 229, .06); border-radius: 6px; }
 .md-line .md-who { font-weight: 700; margin-right: 6px; }
 .md-line .md-fill { opacity: .5; font-style: italic; }
+.md-line .md-given { opacity: .85; }
 .md-line input.md-blank {
   all: unset; box-sizing: content-box; display: inline-block; font: inherit; color: inherit; line-height: 1.35;
   min-width: 1.4ch; padding: 0 3px; margin: 0 1px; vertical-align: baseline; text-align: left;
@@ -61,7 +62,9 @@ let measureCtx: CanvasRenderingContext2D | null = null;
 function textWidth(input: HTMLInputElement, text: string): number {
   measureCtx ??= document.createElement('canvas').getContext('2d');
   if (!measureCtx || !text) return 0;
-  measureCtx.font = getComputedStyle(input).font;
+  const cs = getComputedStyle(input);
+  // Built from longhands: the `font` shorthand reads as "" when a site sets e.g. font-variant.
+  measureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
   return measureCtx.measureText(text).width;
 }
 
@@ -80,6 +83,12 @@ export class InlineBlanks {
   private observer: MutationObserver | null = null;
   private repairTimer = 0;
   private hinted = new Map<number, Set<number>>();
+  /** Share of words that are blanks (1 = every word). */
+  private ratio = 1;
+  /** Per line, which word slots are blanks; the other words are shown. */
+  private blankSlots: Set<number>[] = [];
+  /** Typed but unchecked words, kept by slot while a ratio change hides their blank. */
+  private kept: string[][] = [];
 
   constructor(
     private host: BlankHost,
@@ -99,6 +108,7 @@ export class InlineBlanks {
     }
     this.lines = lines;
     this.parts = lines.map((l) => blankParts(l.text));
+    this.blankSlots = lines.map((_, i) => this.pickBlanks(i));
     this.nodes = lines.map(() => null);
     lines.forEach((_, i) => this.render(i));
     this.observer = new MutationObserver(() => {
@@ -120,10 +130,70 @@ export class InlineBlanks {
     this.lines = [];
     this.current = -1;
     this.hinted.clear();
+    this.kept = [];
   }
 
   get attached(): boolean {
     return this.lines.length > 0;
+  }
+
+  /**
+   * Show only this share of words as blanks. Which words is fixed per line (a
+   * hash of the line and word), so it never shuffles, and every line keeps at
+   * least one blank. What was typed stays with its word.
+   */
+  setRatio(ratio: number): void {
+    const next = Math.min(1, Math.max(0.05, ratio));
+    if (next === this.ratio) return;
+    this.ratio = next;
+    if (!this.attached) return;
+    this.hinted.clear();
+    this.lines.forEach((_, i) => {
+      const kept = (this.kept[i] ??= []);
+      this.slotValues(i).forEach((v, k) => {
+        if (this.blankSlots[i].has(k)) kept[k] = v;
+      });
+      this.blankSlots[i] = this.pickBlanks(i);
+      this.render(i);
+      this.restore(i, kept);
+    });
+    if (this.current >= 0) this.focus(this.current);
+  }
+
+  private wordCount(i: number): number {
+    return this.parts[i].filter((p) => p.word && !p.filler).length;
+  }
+
+  private pickBlanks(i: number): Set<number> {
+    const n = this.wordCount(i);
+    const all = [...Array(n).keys()];
+    if (this.ratio >= 1) return new Set(all);
+    const words = this.parts[i].filter((p) => p.word && !p.filler).map((p) => p.word.toLowerCase());
+    const hash = (str: string) => {
+      let h = 2166136261;
+      for (let c = 0; c < str.length; c += 1) h = Math.imul(h ^ str.charCodeAt(c), 16777619);
+      return h >>> 0;
+    };
+    const keep = Math.max(1, Math.round(n * this.ratio));
+    const ranked = all.sort((a, b) => hash(`${this.lines[i].start}|${a}|${words[a]}`) - hash(`${this.lines[i].start}|${b}|${words[b]}`));
+    return new Set(ranked.slice(0, keep));
+  }
+
+  /** What is in each word slot of line i, by slot; shown words are "". */
+  private slotValues(i: number): string[] {
+    const out = Array<string>(this.wordCount(i)).fill('');
+    for (const b of this.inputs(i)) out[Number(b.dataset.s)] = b.value;
+    return out;
+  }
+
+  private restore(i: number, values: string[]): void {
+    for (const b of this.inputs(i)) {
+      const v = values[Number(b.dataset.s)];
+      if (v) {
+        b.value = v;
+        blankWidth(b, this.wordOf(i, b));
+      }
+    }
   }
 
   // ------------------------------------------------------------ rendering
@@ -142,7 +212,9 @@ export class InlineBlanks {
     }
     const state = this.stateOf(i);
     const typed = state ? state.typed.split(' ') : [];
+    const blanks = this.blankSlots[i];
     let k = 0;
+    let slot = 0;
     this.parts[i].forEach((p, w) => {
       if (p.pre) box.append(p.pre);
       if (p.word && p.filler) {
@@ -150,6 +222,12 @@ export class InlineBlanks {
         f.className = 'md-fill';
         f.textContent = p.word;
         box.append(f);
+      } else if (p.word && !blanks.has(slot)) {
+        const given = document.createElement('span');
+        given.className = 'md-given';
+        given.textContent = p.word;
+        box.append(given);
+        slot += 1;
       } else if (p.word) {
         const input = document.createElement('input');
         input.className = 'md-blank';
@@ -158,11 +236,12 @@ export class InlineBlanks {
         input.setAttribute('autocapitalize', 'off');
         input.setAttribute('aria-label', `Word ${k + 1}`);
         input.dataset.w = String(w);
-        const v = typed[k];
+        input.dataset.s = String(slot);
+        const v = typed[slot];
         input.value = v && v !== '_' ? v : '';
-        blankWidth(input, p.word);
         box.append(input);
         k += 1;
+        slot += 1;
       }
       if (p.post) box.append(p.post);
       box.append(' ');
@@ -209,11 +288,9 @@ export class InlineBlanks {
         this.lines[i] = { ...line, el: fresh.el };
       }
       const hadFocus = node?.contains(document.activeElement);
-      const drafts = this.inputs(i).map((b) => b.value);
+      const drafts = this.slotValues(i);
       this.render(i);
-      this.inputs(i).forEach((b, k) => {
-        if (drafts[k]) b.value = drafts[k];
-      });
+      this.restore(i, drafts);
       if (hadFocus) this.focus(i);
     });
   }
@@ -233,9 +310,10 @@ export class InlineBlanks {
   // ------------------------------------------------------------ state
 
   /** What is typed in line i, "_" for an empty blank. */
+  /** One slot per spoken word, "_" when empty or shown, so a saved answer survives a change of ratio. */
   typed(i: number): string {
-    return this.inputs(i)
-      .map((b) => b.value.trim().replace(/\s+/g, '') || '_')
+    return this.slotValues(i)
+      .map((v) => v.trim().replace(/\s+/g, '') || '_')
       .join(' ');
   }
 

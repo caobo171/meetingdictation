@@ -73,6 +73,25 @@ const PAD_AFTER = 0.35;
 const NUDGE = 2;
 
 const TYPE_IN_PREF = 'mdTypeIn';
+const RATIO_PREF = 'mdBlankRatio';
+const RATIOS = [1, 0.75, 0.5, 0.25];
+
+async function ratioPref(): Promise<number> {
+  try {
+    const v = Number((await chrome.storage.local.get(RATIO_PREF))[RATIO_PREF]);
+    return RATIOS.includes(v) ? v : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function setRatioPref(v: number): void {
+  try {
+    void chrome.storage.local.set({ [RATIO_PREF]: v });
+  } catch {
+    /* extension reloaded under the page */
+  }
+}
 
 async function typeInPref(): Promise<boolean> {
   try {
@@ -234,6 +253,10 @@ const TEMPLATE = `
           <button class="b" data-act="fwd" title="Forward 2 s (3)">+2s</button>
           <button class="b" data-act="next" title="Next segment (Alt+→)">⏭</button>
           <button class="b" data-act="loop" title="Loop segment (Alt+L)">🔁</button>
+          <select data-ref="ratio" class="hidden" title="How many words are blanks">
+            <option value="1">Blanks 100%</option><option value="0.75">Blanks 75%</option>
+            <option value="0.5">Blanks 50%</option><option value="0.25">Blanks 25%</option>
+          </select>
           <select data-ref="rate" title="Speed">
             <option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="0.9">0.9×</option>
             <option value="1" selected>1×</option><option value="1.25">1.25×</option>
@@ -337,6 +360,12 @@ export class DictationPanel {
       void this.save();
     });
     this.refs.file.addEventListener('change', () => void this.loadFile());
+    this.refs.ratio.addEventListener('change', () => {
+      const v = Number((this.refs.ratio as HTMLSelectElement).value);
+      setRatioPref(v);
+      this.inline.setRatio(v);
+      if (this.typing) this.lineVerdict(this.results[this.index]);
+    });
     this.refs.typeIn.addEventListener('change', () => void this.switchTypeIn((this.refs.typeIn as HTMLInputElement).checked));
     this.makeDraggable();
     void this.refreshAccount();
@@ -480,6 +509,12 @@ export class DictationPanel {
     this.refs.result.classList.toggle('hidden', this.typing);
     this.refs.typeHelp.classList.toggle('hidden', !this.typing);
     this.root.querySelector('.wrap')!.classList.toggle('typing', this.typing);
+    this.refs.ratio.classList.toggle('hidden', !this.typing);
+    if (this.typing) {
+      const ratio = await ratioPref();
+      (this.refs.ratio as HTMLSelectElement).value = String(ratio);
+      this.inline.setRatio(ratio);
+    }
     if (this.typing) this.inline.attach(this.lines);
     this.show(this.index);
     this.revealRows();
