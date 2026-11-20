@@ -55,8 +55,21 @@ const CSS = `
 .md-line .md-mark { margin-left: 6px; font-size: 12px; color: #15803d; font-weight: 700; }
 `;
 
+let measureCtx: CanvasRenderingContext2D | null = null;
+
+/** Width of text in this input's own font (the site's font is proportional, so `ch` overshoots). */
+function textWidth(input: HTMLInputElement, text: string): number {
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  if (!measureCtx || !text) return 0;
+  measureCtx.font = getComputedStyle(input).font;
+  return measureCtx.measureText(text).width;
+}
+
+/** Size a blank to its word (so the gap hints at the length) or to what was typed, if longer. */
 function blankWidth(input: HTMLInputElement, word: string): void {
-  input.style.width = `${Math.max(word.length, input.value.length, 1) + 0.4}ch`;
+  if (!input.isConnected) return; // sized once it is on the page
+  const px = Math.max(textWidth(input, word), textWidth(input, input.value), textWidth(input, 'mm'));
+  input.style.width = `${Math.ceil(px) + 2}px`;
 }
 
 export class InlineBlanks {
@@ -177,6 +190,7 @@ export class InlineBlanks {
 
     line.el.setAttribute('data-md-src', '');
     line.el.after(box);
+    box.querySelectorAll<HTMLInputElement>('input.md-blank').forEach((b) => blankWidth(b, this.parts[i][Number(b.dataset.w)].word));
     this.nodes[i] = box;
     if (state) this.paint(i);
     box.classList.toggle('md-cur', i === this.current);
