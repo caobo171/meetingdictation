@@ -27,6 +27,30 @@ On other sites the extension only gets access when you click its button
 
 ## Practising
 
+### Type in the transcript (Loom, YouTube)
+
+Where the site shows its own transcript next to the video, each line becomes a
+row of blanks, one per spoken word, and you type straight into them as on
+WELE's podcast page. Speaker names, punctuation and "uh" / "um" stay visible.
+A word turns green as soon as it is right; <kbd>Enter</kbd> checks the line and
+marks the wrong ones red. A word given by a hint completes the line but does not
+score. Turn it off with **Type in the transcript** in the panel to use the text
+box below instead; the choice is remembered.
+
+| Key | Action |
+| --- | --- |
+| <kbd>Space</kbd> / <kbd>Tab</kbd> | next blank (typing or pasting several words fills the next blanks) |
+| <kbd>Backspace</kbd> on an empty blank | previous blank |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | previous / next line |
+| <kbd>Enter</kbd> | check the line; on a finished line, go to the next one and play it |
+| <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> / <kbd>A</kbd> / <kbd>L</kbd> | as in the text box below |
+
+On Loom the big video is a looping 5-second preview and the real recording stays
+hidden until it is started, so the first <kbd>1</kbd> presses Loom's own play
+button before seeking to the line.
+
+### The text box
+
 Captions are merged into one sentence (or one breath) per segment, split when
 the speaker changes or pauses. Segments that are only "uh" / "um" are skipped.
 
@@ -61,6 +85,7 @@ transcript (Loom, YouTube) un-blur once every segment in them is finished.
 - `src/sync.ts`, `src/background.ts`, `src/connect.content.ts` – account sync
 - `src/sources.ts` – per-site transcript adapters
 - `src/blur.ts` – what gets blurred
+- `src/inline.ts` – blanks inside the site's own transcript lines
 - `src/panel.ts` – the panel (shadow DOM; swallows key events so the site's player shortcuts don't fire)
 - `src/content.ts` / `src/background.ts` – entry points
 

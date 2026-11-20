@@ -135,3 +135,24 @@ describe('mergeResults', () => {
     expect(merged[3].revealed).toBe(true);
   });
 });
+
+import { blankParts, wordMatches } from './src/compare';
+
+describe('blanks', () => {
+  it('splits a line into words with visible punctuation', () => {
+    const parts = blankParts("Let's see. Cool, uh, thanks!");
+    expect(parts.map((p) => p.word)).toEqual(["Let's", 'see', 'Cool', 'uh', 'thanks']);
+    expect(parts[1].post).toBe('.');
+    expect(parts[3].filler).toBe(true);
+    expect(blankParts('— ok')[0]).toEqual({ pre: '—', word: '', post: '', filler: false });
+  });
+
+  it('matches one word the way grading does', () => {
+    expect(wordMatches('Databricks,', 'databricks')).toBe(true);
+    expect(wordMatches('two', '2')).toBe(true);
+    expect(wordMatches("Let's", 'lets')).toBe(true);
+    expect(wordMatches('see', 'sea')).toBe(false);
+    expect(wordMatches("Let's", "let's")).toBe(true);
+    expect(wordMatches('the', '')).toBe(false);
+  });
+});

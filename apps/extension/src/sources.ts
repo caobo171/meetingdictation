@@ -42,13 +42,35 @@ export function findVideo(): HTMLVideoElement | null {
     const r = v.getBoundingClientRect();
     const area = r.width * r.height;
     const longEnough = !Number.isFinite(v.duration) || v.duration > 15 || v.readyState === 0;
-    const score = area * (longEnough ? 1 : 0.01) + (v.textTracks.length ? 1 : 0);
+    // A long recording always beats a short preview, even while hidden: Loom shows a looping
+    // 5-second thumbnail video and keeps the real one at 0x0 until its play button is pressed.
+    const score = (longEnough ? 1e9 : 0) + area + (v.textTracks.length ? 1 : 0);
     if (score > bestScore) {
       best = v;
       bestScore = score;
     }
   }
   return best;
+}
+
+/**
+ * Loom keeps the real recording hidden behind its preview until the viewer
+ * presses play. Press Loom's own play button once so its player is up, then
+ * the caller seeks wherever it wants.
+ */
+export async function wakePlayer(video: HTMLVideoElement): Promise<void> {
+  if (!isLoom()) return;
+  const visible = () => {
+    const r = video.getBoundingClientRect();
+    return r.width * r.height > 0;
+  };
+  if (visible()) return;
+  const button = [...document.querySelectorAll<HTMLElement>('button[aria-label^="Play the video" i]')].find(
+    (b) => b.getBoundingClientRect().width > 0,
+  );
+  if (!button) return;
+  button.click();
+  await waitFor(() => (visible() ? true : null), 3000, 100);
 }
 
 export function isYouTube(): boolean {
@@ -205,17 +227,31 @@ function loomRowEls(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>('[data-testid^="transcript-row-"]')];
 }
 
-async function cuesFromLoomList(video: HTMLVideoElement | null): Promise<{ cues: Cue[]; label: string } | null> {
+/** Loom puts the speaker's name (bold) inside the same element as the words. */
+function loomRow(row: HTMLElement): { start: number; textEl: HTMLElement | null; speaker?: string; text: string } {
+  const textEl = row.querySelector<HTMLElement>('[dir="ltr"]');
+  const name = textEl?.querySelector('span[font-weight="bold"], b, strong');
+  const speaker = name?.textContent?.trim() || undefined;
+  let text = '';
+  textEl?.childNodes.forEach((n) => {
+    if (n !== name) text += n.textContent ?? '';
+  });
+  return { start: parseClock(row.innerText.split('\n')[0] ?? ''), textEl, speaker, text: text.replace(/\s+/g, ' ').trim() };
+}
+
+async function openLoomTranscript(): Promise<boolean> {
   if (!loomRowEls().length) document.querySelector<HTMLElement>('[data-testid="sidebar-tab-Transcript"]')?.click();
-  await waitFor(() => (loomRowEls().length ? true : null), 5000);
+  return !!(await waitFor(() => (loomRowEls().length ? true : null), 5000));
+}
+
+async function cuesFromLoomList(video: HTMLVideoElement | null): Promise<{ cues: Cue[]; label: string } | null> {
+  await openLoomTranscript();
   let speaker: string | undefined;
   const rows = loomRowEls()
     .map((row) => {
-      const lines = row.innerText.split('\n').map((l) => l.trim()).filter(Boolean);
-      const text = row.querySelector('[dir="ltr"]')?.textContent?.trim() ?? '';
-      const start = parseClock(lines[0] ?? '');
-      if (lines.length >= 3 && lines[1] !== text) speaker = lines[1];
-      return { start, text, speaker };
+      const r = loomRow(row);
+      speaker = r.speaker ?? speaker;
+      return { start: r.start, text: r.text, speaker };
     })
     .filter((r) => Number.isFinite(r.start) && r.text);
   if (!rows.length) return null;
@@ -245,26 +281,48 @@ export async function detectSource(video: HTMLVideoElement | null): Promise<Sour
   return null;
 }
 
+/** One line of the transcript the site itself shows next to the video. */
+export interface TranscriptLine {
+  /** The element holding the words (blurred, or swapped for blanks). */
+  el: HTMLElement;
+  start: number;
+  text: string;
+  speaker?: string;
+  /** The speaker's name is printed on this line (a new speaker starts here). */
+  speakerShown: boolean;
+}
+
 /**
  * Transcript rows the site shows next to the video, with their start times,
- * so a row can be un-blurred once every segment in it has been dictated.
+ * so a row can be un-blurred once dictated, or turned into blanks to type in.
  */
-export function visibleTranscriptRows(): { el: HTMLElement; start: number }[] {
+export function transcriptLines(): TranscriptLine[] {
   if (isLoom()) {
+    let speaker: string | undefined;
     return loomRowEls()
-      .map((row) => ({
-        el: row.querySelector<HTMLElement>('[dir="ltr"]')!,
-        start: parseClock(row.innerText.split('\n')[0] ?? ''),
-      }))
+      .map((row) => {
+        const r = loomRow(row);
+        speaker = r.speaker ?? speaker;
+        return { el: r.textEl!, start: r.start, text: r.text, speaker, speakerShown: !!r.speaker };
+      })
       .filter((r) => r.el && Number.isFinite(r.start));
   }
   if (isYouTube()) {
     return ytPanelRows()
       .map((row) => {
         const { start, textEl } = ytRow(row);
-        return { el: textEl!, start };
+        return { el: textEl!, start, text: (textEl?.textContent ?? '').replace(/\s+/g, ' ').trim(), speakerShown: false };
       })
       .filter((r) => r.el && Number.isFinite(r.start));
   }
   return [];
+}
+
+export const visibleTranscriptRows = transcriptLines;
+
+/** Open the site's transcript list (Loom's tab, YouTube's panel) if it has one. */
+export async function openSiteTranscript(): Promise<boolean> {
+  if (isLoom()) return openLoomTranscript();
+  if (isYouTube()) return openYouTubeTranscriptPanel().catch(() => false);
+  return false;
 }

@@ -223,3 +223,36 @@ export function hint(reference: string, typed: string): string {
 export function hasWords(text: string): boolean {
   return tokenize(text).some((t) => t.units.length > 0);
 }
+
+/** One slot of a transcript line in "type in the blanks" mode. */
+export interface BlankPart {
+  /** Punctuation shown as-is before the word. */
+  pre: string;
+  /** The word to type; empty when the token is only punctuation. */
+  word: string;
+  post: string;
+  /** "uh", "um"…: shown, never asked for. */
+  filler: boolean;
+}
+
+/** Split a transcript line into blanks, one per spoken word, with its punctuation kept visible. */
+export function blankParts(text: string): BlankPart[] {
+  return (text || '')
+    .replace(/[’‘]/g, "'")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((tok) => {
+      const m = tok.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}%]*)$/u)!;
+      const word = m[2];
+      return { pre: m[1], word, post: m[3], filler: !!word && unitsOf(word).length === 0 };
+    });
+}
+
+/** Does one typed word count as this transcript word? Same rules as grade(). */
+export function wordMatches(reference: string, typed: string): boolean {
+  const a = unitsOf(reference).join(' ');
+  const b = unitsOf(typed.trim()).join(' ');
+  if (!b) return false;
+  const bare = (w: string) => normalizeWord(w).replace(/'/g, '');
+  return a === b || bare(reference) === bare(typed); // "lets" for "let's"
+}

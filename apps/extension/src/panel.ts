@@ -13,11 +13,17 @@
 import { setBlur } from './blur';
 import { grade, hasWords, hint, type Grade } from '@md/core';
 import { buildSegments, mergeResults, parseSubtitleFile, transcriptFingerprint, type Segment } from '@md/core';
+import { InlineBlanks, type LineState } from './inline';
 import {
   detectSource,
   findVideo,
+  isLoom,
   isYouTube,
+  openSiteTranscript,
+  transcriptLines,
   visibleTranscriptRows,
+  wakePlayer,
+  type TranscriptLine,
   youTubeAdShowing,
   youTubeVideoId,
   type Source,
@@ -65,6 +71,30 @@ interface Saved {
 const PAD_BEFORE = 0.15;
 const PAD_AFTER = 0.35;
 const NUDGE = 2;
+
+const TYPE_IN_PREF = 'mdTypeIn';
+
+async function typeInPref(): Promise<boolean> {
+  try {
+    const r = await chrome.storage.local.get(TYPE_IN_PREF);
+    return r[TYPE_IN_PREF] !== false;
+  } catch {
+    return true;
+  }
+}
+
+function setTypeInPref(on: boolean): void {
+  try {
+    void chrome.storage.local.set({ [TYPE_IN_PREF]: on });
+  } catch {
+    /* extension reloaded under the page */
+  }
+}
+
+/** The site's transcript lines that have words in them. */
+function typeableLines(): TranscriptLine[] {
+  return transcriptLines().filter((l) => hasWords(l.text));
+}
 
 const storage = {
   async get(key: string): Promise<Saved | null> {
@@ -161,6 +191,8 @@ kbd { font: 11px ui-monospace, monospace; background: #f1f2f7; border: 1px solid
 .msg { padding: 6px 2px; color: #5d6276; }
 .msg strong { color: #1f2333; }
 .hidden { display: none !important; }
+.wrap.typing { right: auto; left: 20px; }
+.wrap.typing .keys, .wrap.typing [data-act="check"], .wrap.typing .result, .wrap.typing textarea { display: none; }
 @media (prefers-color-scheme: dark) {
   .wrap { color: #e7e9f3; }
   .card { background: #1c1e29; border-color: #2f3242; }
@@ -207,6 +239,7 @@ const TEMPLATE = `
             <option value="1" selected>1×</option><option value="1.25">1.25×</option>
           </select>
         </div>
+        <div class="msg hidden" data-ref="typeHelp">Type in the blanks in the transcript. <kbd>Space</kbd> next word · <kbd>Enter</kbd> check · <kbd>1</kbd> play</div>
         <textarea data-ref="input" spellcheck="false" autocomplete="off" placeholder="Type what you hear…  (1 = play, Enter = check)"></textarea>
         <div class="verdict bad hidden" data-ref="note"></div>
         <div class="verdict" data-ref="verdict"></div>
@@ -223,6 +256,7 @@ const TEMPLATE = `
     </div>
     <footer>
       <label><input type="checkbox" data-ref="blur" checked> Blur transcript &amp; captions</label>
+      <label class="hidden" data-ref="typeInWrap" title="Turn the transcript next to the video into blanks you type in"><input type="checkbox" data-ref="typeIn" checked> Type in the transcript</label>
       <span><a data-act="load">Load .vtt / .srt</a> · <a data-act="reset">Restart</a></span>
       <span class="acct" data-ref="acct"></span>
       <input type="file" data-ref="file" accept=".vtt,.srt,.txt,text/vtt" class="hidden">
@@ -251,6 +285,29 @@ export class DictationPanel {
   private lastTick = 0;
   private pushTimer = 0;
   private email: string | null = null;
+  private source: Source | null = null;
+  /** Typing straight into the site's transcript lines instead of the box. */
+  private typing = false;
+  private typeIn = true;
+  private lines: TranscriptLine[] = [];
+  private playerWoken = false;
+  private inline = new InlineBlanks(
+    {
+      select: (i) => {
+        if (i !== this.index) this.show(i, false);
+      },
+      check: (i) => {
+        if (i !== this.index) this.show(i, false);
+        this.check();
+        this.focus();
+      },
+      togglePlay: () => this.togglePlay(),
+      nudge: (d) => this.nudge(d),
+      act: (name) => this.act(name),
+    },
+    (i) => this.lineState(i),
+    typeableLines,
+  );
 
   constructor() {
     this.host = document.createElement('meeting-dictation');
@@ -280,6 +337,7 @@ export class DictationPanel {
       void this.save();
     });
     this.refs.file.addEventListener('change', () => void this.loadFile());
+    this.refs.typeIn.addEventListener('change', () => void this.switchTypeIn((this.refs.typeIn as HTMLInputElement).checked));
     this.makeDraggable();
     void this.refreshAccount();
     onAuthChange(() => {
@@ -303,10 +361,24 @@ export class DictationPanel {
 
   // ------------------------------------------------------------ lifecycle
 
+  private get progressKey(): string {
+    return this.typing ? `${this.key}#blanks` : this.key;
+  }
+
+  private lineState(i: number): LineState | undefined {
+    const r = this.results[i];
+    return r ? { typed: r.typed, revealed: r.revealed, checked: true } : undefined;
+  }
+
   async start(): Promise<void> {
     this.video = findVideo();
     setBlur(this.blur, this.video);
     this.status('Looking for the transcript…');
+    this.typeIn = await typeInPref();
+    const hasList = isLoom() || isYouTube();
+    this.refs.typeInWrap.classList.toggle('hidden', !hasList);
+    (this.refs.typeIn as HTMLInputElement).checked = this.typeIn;
+    if (hasList && this.typeIn && (await this.startTyping())) return;
     const source = await detectSource(this.video);
     if (!source) {
       this.status(
@@ -317,10 +389,51 @@ export class DictationPanel {
     await this.useSource(source);
   }
 
+  /** Turn the site's own transcript lines into blanks. False when the page has none. */
+  private async startTyping(): Promise<boolean> {
+    if (!typeableLines().length) await openSiteTranscript();
+    const lines = typeableLines();
+    if (!lines.length) return false;
+    const duration = this.video && Number.isFinite(this.video.duration) && !youTubeAdShowing() ? this.video.duration : 0;
+    this.lines = lines;
+    this.typing = true;
+    this.segments = lines.map((l, i) => ({
+      start: l.start,
+      end: Math.max(l.start + 0.5, lines[i + 1]?.start ?? (duration > l.start ? duration : l.start + 10)),
+      text: l.text,
+      speaker: l.speaker,
+    }));
+    this.results = {};
+    this.index = 0;
+    await this.begin(`${isLoom() ? 'Loom' : 'YouTube'} transcript · ${lines.length} lines`);
+    return true;
+  }
+
+  private async switchTypeIn(on: boolean): Promise<void> {
+    this.typeIn = on;
+    setTypeInPref(on);
+    this.pauseSegment();
+    if (on) {
+      if (await this.startTyping()) return;
+      this.typeIn = false;
+      (this.refs.typeIn as HTMLInputElement).checked = false;
+      this.note('This page has no transcript list to type in.');
+      return;
+    }
+    this.inline.detach();
+    this.typing = false;
+    const source = this.source ?? (await detectSource(this.video));
+    if (source) await this.useSource(source);
+    else this.status('<strong>No captions found on this page.</strong>');
+  }
+
   /** In-site navigation to another video (YouTube): start over for the new page. */
   async restartForNewPage(): Promise<void> {
     if (!this.started) return;
     this.pauseSegment();
+    this.inline.detach();
+    this.typing = false;
+    this.source = null;
     this.key = pageKey();
     this.segments = [];
     this.results = {};
@@ -329,14 +442,23 @@ export class DictationPanel {
   }
 
   private async useSource(source: Source): Promise<void> {
+    this.source = source;
+    this.inline.detach();
+    this.typing = false;
     this.segments = buildSegments(source.cues).filter((s) => hasWords(s.text));
     if (!this.segments.length) {
       this.status('<strong>The transcript is empty.</strong>');
       return;
     }
-    this.refs.src.textContent = `${source.label} · ${this.segments.length} segments`;
+    this.results = {};
+    await this.begin(`${source.label} · ${this.segments.length} segments`);
+  }
+
+  /** Segments are set: load saved progress and show the first one. */
+  private async begin(label: string): Promise<void> {
+    this.refs.src.textContent = label;
     const fp = transcriptFingerprint(this.segments);
-    const [saved, remote] = await Promise.all([storage.get(this.key), pullProgress(this.key)]);
+    const [saved, remote] = await Promise.all([storage.get(this.progressKey), pullProgress(this.progressKey)]);
     if (saved && saved.fp === fp) {
       this.index = Math.min(saved.index, this.segments.length - 1);
       this.results = saved.results ?? {};
@@ -354,6 +476,11 @@ export class DictationPanel {
     setBlur(this.blur, this.video);
     this.refs.status.classList.add('hidden');
     this.refs.main.classList.remove('hidden');
+    this.refs.input.classList.toggle('hidden', this.typing);
+    this.refs.result.classList.toggle('hidden', this.typing);
+    this.refs.typeHelp.classList.toggle('hidden', !this.typing);
+    this.root.querySelector('.wrap')!.classList.toggle('typing', this.typing);
+    if (this.typing) this.inline.attach(this.lines);
     this.show(this.index);
     this.revealRows();
     this.focus();
@@ -383,11 +510,19 @@ export class DictationPanel {
     if (!this.started) {
       this.started = true;
       void this.start();
-    } else setBlur(this.blur, this.video);
+    } else {
+      setBlur(this.blur, this.video);
+      if (this.typing && !this.inline.attached) {
+        this.lines = typeableLines();
+        this.inline.attach(this.lines);
+        this.inline.setCurrent(this.index, true);
+      }
+    }
   }
 
   close(): void {
     this.pauseSegment();
+    this.inline.detach();
     setBlur(false, this.video);
     this.host.remove();
   }
@@ -415,11 +550,20 @@ export class DictationPanel {
 
   // ------------------------------------------------------------ segment view
 
-  private show(i: number): void {
+  private show(i: number, scroll = true): void {
     this.pauseSegment();
     this.index = Math.max(0, Math.min(i, this.segments.length - 1));
     const seg = this.segments[this.index];
     const r = this.results[this.index];
+    if (this.typing) {
+      this.inline.setCurrent(this.index, scroll);
+      this.lineVerdict(r);
+      this.refs.pos.textContent = `Line ${this.index + 1} / ${this.segments.length} · ${fmt(seg.start)}`;
+      this.refs.who.textContent = seg.speaker ?? '';
+      this.updateStats();
+      void this.save();
+      return;
+    }
     const input = this.refs.input as HTMLTextAreaElement;
     input.value = r?.typed ?? '';
     input.classList.toggle('pass', !!r?.passed);
@@ -471,7 +615,49 @@ export class DictationPanel {
     }
   }
 
+  private lineVerdict(r?: Result): void {
+    const v = this.refs.verdict;
+    if (!r) {
+      v.textContent = '';
+      v.className = 'verdict';
+    } else if (r.passed) {
+      v.textContent = '✓ Perfect! Enter for the next line';
+      v.className = 'verdict good';
+    } else if (r.revealed) {
+      v.textContent = 'Answer shown. Enter for the next line';
+      v.className = 'verdict bad';
+    } else {
+      const { wrong, score } = this.inline.grade(this.index);
+      v.textContent = `${Math.round(score * 100)}% · ${wrong} word${wrong === 1 ? '' : 's'} to fix`;
+      v.className = 'verdict bad';
+    }
+  }
+
+  private checkLine(): void {
+    const i = this.index;
+    const typed = this.inline.typed(i);
+    const prev = this.results[i];
+    if (prev?.revealed || (prev?.passed && typed === prev.typed)) {
+      this.next();
+      return;
+    }
+    if (this.inline.isEmpty(i)) {
+      this.playSegment(true);
+      return;
+    }
+    const g = this.inline.grade(i);
+    this.results[i] = { typed, score: Math.max(prev?.score ?? 0, g.score), passed: g.passed, revealed: false };
+    this.inline.paint(i);
+    this.lineVerdict(this.results[i]);
+    this.updateStats();
+    void this.save();
+  }
+
   private check(): void {
+    if (this.typing) {
+      this.checkLine();
+      return;
+    }
     const seg = this.segments[this.index];
     const typed = (this.refs.input as HTMLTextAreaElement).value;
     const prev = this.results[this.index];
@@ -500,6 +686,10 @@ export class DictationPanel {
   }
 
   private giveHint(): void {
+    if (this.typing) {
+      this.inline.hint(this.index);
+      return;
+    }
     const input = this.refs.input as HTMLTextAreaElement;
     input.value = hint(this.segments[this.index].text, input.value);
     input.setSelectionRange(input.value.length, input.value.length);
@@ -507,6 +697,18 @@ export class DictationPanel {
   }
 
   private showAnswer(): void {
+    if (this.typing) {
+      const i = this.index;
+      const typed = this.inline.typed(i);
+      const g = this.inline.grade(i);
+      const prev = this.results[i];
+      this.results[i] = { typed, score: prev?.score ?? g.score, passed: g.passed, revealed: true };
+      this.inline.paint(i);
+      this.lineVerdict(this.results[i]);
+      this.updateStats();
+      void this.save();
+      return;
+    }
     const typed = (this.refs.input as HTMLTextAreaElement).value;
     const seg = this.segments[this.index];
     const g = grade(seg.text, typed);
@@ -546,6 +748,7 @@ export class DictationPanel {
 
   /** Un-blur the site's transcript rows whose segments are all finished. */
   private revealRows(): void {
+    if (this.typing) return;
     const rows = visibleTranscriptRows();
     rows.forEach((row, i) => {
       const end = rows[i + 1]?.start ?? Number.POSITIVE_INFINITY;
@@ -564,6 +767,11 @@ export class DictationPanel {
     if (!v || !this.segments.length) return;
     if (isYouTube() && youTubeAdShowing()) {
       this.note('An ad is playing. Press 1 again when the video starts.');
+      return;
+    }
+    if (!this.playerWoken) {
+      this.playerWoken = true;
+      void wakePlayer(v).then(() => this.playSegment(fromStart));
       return;
     }
     const seg = this.segments[this.index];
@@ -656,6 +864,7 @@ export class DictationPanel {
       case 'reset':
         if (confirm('Start this recording over? Your answers here will be cleared.')) {
           this.results = {};
+          if (this.typing) this.inline.attach(this.lines);
           this.root.querySelectorAll('.md-done').forEach((el) => el.classList.remove('md-done'));
           document.querySelectorAll('.md-done').forEach((el) => el.classList.remove('md-done'));
           this.show(0);
@@ -700,6 +909,10 @@ export class DictationPanel {
   }
 
   private focus(): void {
+    if (this.typing) {
+      requestAnimationFrame(() => this.inline.focus(this.index, true));
+      return;
+    }
     requestAnimationFrame(() => (this.refs.input as HTMLTextAreaElement).focus({ preventScroll: true }));
   }
 
@@ -717,7 +930,7 @@ export class DictationPanel {
   private async save(): Promise<void> {
     if (!this.segments.length) return;
     this.schedulePush(1500);
-    await storage.set(this.key, {
+    await storage.set(this.progressKey, {
       fp: transcriptFingerprint(this.segments),
       index: this.index,
       results: this.results,
@@ -737,7 +950,7 @@ export class DictationPanel {
     if (!this.email || !this.segments.length) return;
     const seconds = Math.min(3600, Math.round(this.played));
     const ok = await pushProgress({
-      key: this.key,
+      key: this.progressKey,
       title: pageTitle(),
       url: location.href,
       site: siteName(),
