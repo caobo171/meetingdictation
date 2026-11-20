@@ -38,7 +38,7 @@ export interface LineState {
 const STYLE_ID = 'meetingdictation-blanks';
 const CSS = `
 [data-md-src] { display: none !important; }
-.md-line { display: block; line-height: 2.05; filter: none !important; user-select: text; cursor: text; }
+.md-line { position: relative; display: block; line-height: 2.05; filter: none !important; user-select: text; cursor: text; }
 .md-line.md-cur { background: rgba(79, 70, 229, .06); border-radius: 6px; }
 .md-line .md-who { font-weight: 700; margin-right: 6px; }
 .md-line .md-fill { opacity: .5; font-style: italic; }
@@ -53,26 +53,40 @@ const CSS = `
 .md-line input.md-blank.bad { color: #dc2626; background: rgba(239, 68, 68, .09); border-bottom-color: #ef4444; }
 .md-line input.md-blank.hinted { color: #c2410c; border-bottom-color: #fb923c; }
 .md-line input.md-blank.rev { color: #b91c1c; font-style: italic; border-bottom-style: dotted; background: transparent; }
+.md-line .md-measure { position: absolute; visibility: hidden; white-space: pre; pointer-events: none; left: 0; top: 0; }
+.md-line .md-measure.rev { font-style: italic; }
 .md-line .md-mark { margin-left: 6px; font-size: 12px; color: #15803d; font-weight: 700; }
 `;
 
-let measureCtx: CanvasRenderingContext2D | null = null;
-
-/** Width of text in this input's own font (the site's font is proportional, so `ch` overshoots). */
+/**
+ * Width of text as the page really draws it: a hidden copy inside the same
+ * line, so it picks up the site's font, letter-spacing and font features
+ * (a canvas measurement misses those and comes out short).
+ */
 function textWidth(input: HTMLInputElement, text: string): number {
-  measureCtx ??= document.createElement('canvas').getContext('2d');
-  if (!measureCtx || !text) return 0;
-  const cs = getComputedStyle(input);
-  // Built from longhands: the `font` shorthand reads as "" when a site sets e.g. font-variant.
-  measureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  return measureCtx.measureText(text).width;
+  const line = input.parentElement;
+  if (!line || !text) return 0;
+  let probe = line.querySelector<HTMLElement>(':scope > .md-measure');
+  if (!probe) {
+    probe = document.createElement('span');
+    probe.className = 'md-measure';
+    probe.setAttribute('aria-hidden', 'true');
+    line.append(probe);
+  }
+  probe.classList.toggle('rev', input.classList.contains('rev'));
+  probe.textContent = text;
+  return probe.getBoundingClientRect().width;
 }
 
-/** Size a blank to its word (so the gap hints at the length) or to what was typed, if longer. */
+/**
+ * Size a blank to its word, with room to spare so typing the last letter never
+ * reaches the edge; it grows only when what is typed is longer than that.
+ */
 function blankWidth(input: HTMLInputElement, word: string): void {
   if (!input.isConnected) return; // sized once it is on the page
-  const px = Math.max(textWidth(input, word), textWidth(input, input.value), textWidth(input, 'mm'));
-  input.style.width = `${Math.ceil(px) + 2}px`;
+  const spare = textWidth(input, 'm') * 0.6;
+  const px = Math.max(textWidth(input, word) + spare, textWidth(input, input.value) + 3, textWidth(input, 'mm'));
+  input.style.width = `${Math.ceil(px)}px`;
 }
 
 export class InlineBlanks {
