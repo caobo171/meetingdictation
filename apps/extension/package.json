@@ -1,0 +1,20 @@
+{
+  "name": "@md/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Blur the transcript of a recorded meeting (Loom, Zoom, Teams, Meet, any captioned video) and practise dictation on it, WELE-style.",
+  "scripts": {
+    "build": "tsc --noEmit && node build.mjs",
+    "watch": "node build.mjs --watch",
+    "test": "echo \"core tests live in @md/core\""
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@md/core": "*"
+  }
+}

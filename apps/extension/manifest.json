@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "MeetingDictation",
+  "version": "0.2.0",
+  "description": "Blur the transcript of a recorded meeting and practise dictation on it, sentence by sentence. Works on Loom and any captioned video.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "action": {
+    "default_title": "MeetingDictation: start dictation on this video",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.loom.com/share/*",
+        "https://loom.com/share/*",
+        "https://www.loom.com/embed/*",
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*"
+      ],
+      "js": [
+        "dist/content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:4100/extension/connect*",
+        "https://meetingdictation.app/extension/connect*"
+      ],
+      "js": [
+        "dist/connect.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
+      "description": "Open or close dictation on this tab"
+    }
+  },
+  "host_permissions": [
+    "http://localhost:4100/*",
+    "https://meetingdictation.app/*"
+  ]
+}

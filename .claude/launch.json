@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "meetingdictation-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "@md/web"],
+      "cwd": "/Users/kaonguyen/project/meetingdictation",
+      "port": 4100
+    }
+  ]
+}

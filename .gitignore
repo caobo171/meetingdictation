@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+*.zip
+.env
+.env.local
+*.db
+*.db-journal
+uploads/
+.DS_Store
+.dev-test-account
+*.tsbuildinfo

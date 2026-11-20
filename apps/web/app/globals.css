@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* WELE's warm paper and deep ink, with MeetingDictation's own indigo.
+   Channels ("r g b"), so Tailwind's opacity modifiers like bg-brand/40 work. */
+:root {
+  --bg: 247 241 229;
+  --bg2: 239 231 213;
+  --paper: 255 252 245;
+  --line: 230 220 200;
+  --ink: 20 24 31;
+  --ink-2: 61 67 79;
+  --ink-3: 107 114 128;
+  --brand: 79 70 229;
+  --brand-deep: 55 48 163;
+  --brand-soft: 224 231 255;
+  --gold: 242 199 68;
+  --gold-soft: 253 241 199;
+  --good: 21 128 61;
+  --good-soft: 220 252 231;
+  --bad: 194 65 12;
+  --bad-soft: 255 237 213;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 18 20 27;
+    --bg2: 25 28 37;
+    --paper: 28 31 42;
+    --line: 44 48 64;
+    --ink: 238 240 246;
+    --ink-2: 195 199 212;
+    --ink-3: 139 145 165;
+    --brand: 129 140 248;
+    --brand-deep: 165 180 252;
+    --brand-soft: 42 43 90;
+    --gold: 242 199 68;
+    --gold-soft: 59 50 32;
+    --good: 74 222 128;
+    --good-soft: 20 50 31;
+    --bad: 251 146 60;
+    --bad-soft: 58 35 22;
+  }
+}
+
+html, body { background: rgb(var(--bg)); color: rgb(var(--ink)); }
+
+@layer components {
+  .card { @apply rounded-xl2 border border-line bg-paper shadow-card; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-default; }
+  .btn-primary { @apply btn bg-brand text-white hover:bg-brand-deep dark:text-ink; }
+  .btn-ghost { @apply btn border border-line bg-paper text-ink hover:bg-bg2; }
+  .btn-gold { @apply btn bg-gold text-[#14181f] hover:brightness-95; }
+  .input { @apply w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[15px] text-ink outline-none transition placeholder:text-ink-3 focus:border-brand focus:ring-4 focus:ring-brand/15; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-ink-2; }
+  .kbd { @apply rounded-md border border-b-2 border-line bg-bg2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2; }
+}

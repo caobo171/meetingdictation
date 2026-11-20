@@ -1,0 +1,84 @@
+// SQLite for local development. For production switch the provider to
+// "mysql" or "postgresql" and point DATABASE_URL at it; the schema is portable.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  image        String?
+  passwordHash String?
+  createdAt    DateTime      @default(now())
+  recordings   Recording[]
+  progress     Progress[]
+  days         ActivityDay[]
+  tokens       ExtToken[]
+}
+
+/// A recording practised on the website: an uploaded file or a YouTube video, plus its transcript.
+model Recording {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  sourceType   String // "upload" | "youtube"
+  sourceUrl    String?
+  mediaPath    String?
+  mediaType    String?
+  cues         String // JSON Cue[]
+  segmentCount Int
+  createdAt    DateTime @default(now())
+}
+
+/// Dictation progress on one recording, from the website ("web:<recordingId>") or the extension (page key).
+model Progress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  title       String
+  url         String?
+  source      String // "web" | "extension"
+  site        String?
+  fp          String
+  total       Int
+  index       Int      @default(0)
+  results     String   @default("{}") // JSON Record<number, Result>
+  done        Int      @default(0)
+  scoreAvg    Float    @default(0)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, key])
+}
+
+/// Per learner, per local calendar day: drives the streak and the activity chart.
+model ActivityDay {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day      String // YYYY-MM-DD in the learner's own time zone
+  segments Int    @default(0)
+  seconds  Int    @default(0)
+
+  @@unique([userId, day])
+}
+
+/// The extension's sign-in. Only the sha256 of the token is stored.
+model ExtToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  label      String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+}
