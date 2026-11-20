@@ -41,10 +41,13 @@ export function findVideo(): HTMLVideoElement | null {
   for (const v of videos) {
     const r = v.getBoundingClientRect();
     const area = r.width * r.height;
-    const longEnough = !Number.isFinite(v.duration) || v.duration > 15 || v.readyState === 0;
     // A long recording always beats a short preview, even while hidden: Loom shows a looping
     // 5-second thumbnail video and keeps the real one at 0x0 until its play button is pressed.
-    const score = (longEnough ? 1e9 : 0) + area + (v.textTracks.length ? 1 : 0);
+    // A duration not loaded yet ranks between the two, so a big preview still loading never
+    // beats a recording whose length is known.
+    const known = Number.isFinite(v.duration) && v.readyState > 0;
+    const rank = known ? (v.duration > 15 ? 2e9 : 0) : 1e9;
+    const score = rank + area + (v.textTracks.length ? 1 : 0);
     if (score > bestScore) {
       best = v;
       bestScore = score;

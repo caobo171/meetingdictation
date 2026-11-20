@@ -798,7 +798,15 @@ export class DictationPanel {
   // ------------------------------------------------------------ playback
 
   private playSegment(fromStart: boolean): void {
-    const v = this.video ?? (this.video = findVideo());
+    // Look again on every play: the panel may have opened before the page created its real
+    // player (Loom adds the recording after its preview), and the first pick would be the preview.
+    const found = findVideo();
+    if (found && found !== this.video) {
+      this.video = found;
+      found.playbackRate = this.rate;
+      setBlur(this.blur, found);
+    }
+    const v = this.video;
     if (!v || !this.segments.length) return;
     if (isYouTube() && youTubeAdShowing()) {
       this.note('An ad is playing. Press 1 again when the video starts.');
