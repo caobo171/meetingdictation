@@ -11,10 +11,16 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
     "esbuild": "^0.24.0",
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@md/core": "*"
+    "@md/core": "*",
+    "@radix-ui/react-checkbox": "^1.1.4",
+    "@radix-ui/react-select": "^2.1.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

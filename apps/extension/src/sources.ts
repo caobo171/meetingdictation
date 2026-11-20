@@ -13,7 +13,7 @@
 
 import { type Cue, parseClock, rowsToCues } from '@md/core';
 
-export type SourceKind = 'youtube' | 'captions' | 'loom' | 'file';
+export type SourceKind = 'youtube' | 'captions' | 'loom' | 'stream' | 'file';
 
 export interface Source {
   kind: SourceKind;
@@ -80,6 +80,11 @@ export function isYouTube(): boolean {
   return /(^|\.)youtube\.com$/.test(location.hostname);
 }
 
+/** Microsoft Stream's player on SharePoint / OneDrive: where Teams meeting recordings are saved. */
+export function isStream(): boolean {
+  return /\.sharepoint\.com$/.test(location.hostname) && /\/_layouts\/15\/stream\.aspx$/i.test(location.pathname);
+}
+
 export function isLoom(): boolean {
   return /(^|\.)loom\.com$/.test(location.hostname);
 }
@@ -87,6 +92,45 @@ export function isLoom(): boolean {
 export function youTubeVideoId(): string | null {
   const u = new URL(location.href);
   return u.searchParams.get('v') || u.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]{6,})/)?.[1] || null;
+}
+
+// ---------------------------------------------------------------- Microsoft Stream (Teams recordings)
+
+/** "00:01:08.8614762" → 68.86 */
+function offsetSeconds(t: string): number {
+  const m = t.match(/^(\d+):(\d+):(\d+(?:\.\d+)?)$/);
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : NaN;
+}
+
+/**
+ * Stream lists only the transcript entries in view, so read the whole
+ * transcript the way its player does: the item's API URL is in the page's
+ * g_fileInfo script, and the request rides on the viewer's own sign-in.
+ */
+export async function cuesFromStream(): Promise<{ cues: Cue[]; label: string } | null> {
+  if (!isStream()) return null;
+  const pattern = /"\.spItemUrl"\s*:\s*"((?:[^"\\]|\\.)*)"/;
+  let raw: string | undefined;
+  for (const script of document.scripts) {
+    raw = script.textContent?.match(pattern)?.[1];
+    if (raw) break;
+  }
+  if (!raw) return null;
+  const item = (JSON.parse(`"${raw}"`) as string).replace(':443/', '/').replace('/_api/v2.0/', '/_api/v2.1/').replace(/\?.*$/, '');
+  const list = await fetch(`${item}/media/transcripts`, { credentials: 'include' });
+  if (!list.ok) return null;
+  type Meta = { id: string; isDefault?: boolean; languageTag?: string; displayName?: string };
+  const transcripts = ((await list.json()) as { value?: Meta[] }).value ?? [];
+  const pick = transcripts.find((t) => t.languageTag?.startsWith('en') && t.isDefault) ?? transcripts.find((t) => t.languageTag?.startsWith('en')) ?? transcripts.find((t) => t.isDefault) ?? transcripts[0];
+  if (!pick) return null;
+  const content = await fetch(`${item}/media/transcripts/${pick.id}/streamContent?format=json`, { credentials: 'include' });
+  if (!content.ok) return null;
+  type Entry = { startOffset: string; endOffset: string; text: string; speakerDisplayName?: string };
+  const entries = ((await content.json()) as { entries?: Entry[] }).entries ?? [];
+  const cues: Cue[] = entries
+    .map((e) => ({ start: offsetSeconds(e.startOffset), end: offsetSeconds(e.endOffset), text: e.text ?? '', speaker: e.speakerDisplayName || undefined }))
+    .filter((c) => Number.isFinite(c.start) && Number.isFinite(c.end) && c.text.trim());
+  return cues.length ? { cues, label: `Stream transcript${pick.languageTag ? ` (${pick.languageTag})` : ''}` } : null;
 }
 
 // ---------------------------------------------------------------- captions track
@@ -272,6 +316,10 @@ export async function detectSource(video: HTMLVideoElement | null): Promise<Sour
       const panel = await cuesFromYouTubePanel(video).catch(() => null);
       if (panel) return { kind: 'youtube', ...panel };
     }
+  }
+  if (isStream()) {
+    const stream = await cuesFromStream().catch(() => null);
+    if (stream) return { kind: 'stream', ...stream };
   }
   if (video) {
     const tracks = await cuesFromTracks(video).catch(() => null);

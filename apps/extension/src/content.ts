@@ -1,11 +1,12 @@
 /**
- * Entry point. Runs on its own on Loom and YouTube (as a small "Dictation"
- * pill), and on any other page when the toolbar button is clicked: the
- * background worker injects this same file, and a second run toggles the panel.
+ * Entry point. Runs on its own on Loom, YouTube and Microsoft Stream (Teams
+ * recordings) as a small "Dictation" pill, and on any other page when the
+ * toolbar button is clicked: the background worker injects this same file, and
+ * a second run toggles the panel.
  */
 
 import { DictationPanel } from './panel';
-import { isYouTube } from './sources';
+import { isStream, isYouTube } from './sources';
 
 declare global {
   interface Window {
@@ -21,7 +22,7 @@ if (existing) {
 } else {
   const panel = new DictationPanel();
   // Ran from the manifest (Loom / YouTube) → just the pill; ran from a click → open straight away.
-  const fromClick = !!(document as Document & { __mdClick?: boolean }).__mdClick || !(/loom\.com$|youtube\.com$/.test(location.hostname));
+  const fromClick = !!(document as Document & { __mdClick?: boolean }).__mdClick || !(/loom\.com$|youtube\.com$/.test(location.hostname) || isStream());
   window.__meetingDictation = { panel, injected: fromClick };
   const onVideoPage = () => !isYouTube() || /^\/(watch|shorts|live)/.test(location.pathname);
   if (fromClick) panel.open();

@@ -20,7 +20,15 @@ Sign in to sync: the panel's footer links to the website's
 | Loom (`/share`, `/embed`) | the video's captions track; Loom's transcript list as fallback | a **Dictation** pill bottom-right |
 | YouTube watch pages | the caption track if YouTube serves it, else it opens YouTube's own transcript panel | a **Dictation** pill |
 | Any other page with a `<video>` that has a captions/subtitles track | the track | toolbar button or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> |
-| Zoom, Teams, Meet, Drive, anything else | download the recording's `.vtt` / `.srt` and use **Load .vtt / .srt** in the panel | toolbar button |
+| Teams meeting recordings in Microsoft Stream (`*.sharepoint.com/…/stream.aspx`) | the recording's full transcript from Stream's own API, with speakers | a **Dictation** pill |
+| Zoom, Meet, Drive, anything else | download the recording's `.vtt` / `.srt` and use **Load .vtt / .srt** in the panel | toolbar button |
+
+Teams' own Recap view puts the player and the transcript in two separate frames,
+so dictation runs on the recording's Stream page instead: in the meeting chat open
+**Shared**, then the recording's `sharepoint.com/:v:/…` link. Stream shows only the
+transcript entries in view, so the panel reads the whole transcript from the same
+API Stream's player uses, signed in as you; typing into the transcript itself is
+Loom and YouTube only, and on Stream you type in the panel.
 
 On other sites the extension only gets access when you click its button
 (`activeTab`). It has no standing permission there.
@@ -46,6 +54,12 @@ box below instead; the choice is remembered.
 | <kbd>↑</kbd> / <kbd>↓</kbd> | previous / next line |
 | <kbd>Enter</kbd> | check the line; on a finished line, go to the next one and play it |
 | <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> / <kbd>A</kbd> / <kbd>L</kbd> | as in the text box below |
+
+The panel lists these keys. Change any of them with the ⚙ button in the panel's header: click a key, press
+the new one (Esc cancels). A letter on its own, and the keys typing needs (Space, Enter, arrows), need
+<kbd>Alt</kbd> or <kbd>Ctrl</kbd> added; <kbd>Ctrl</kbd>/<kbd>⌘</kbd> plus a bare key such as <kbd>1</kbd> still types it. <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> and the <kbd>Alt</kbd> keys also work when
+the focus is on the page (after clicking the video), so the site's player never takes them; they are
+left alone only inside the site's own text fields.
 
 On Loom the big video is a looping 5-second preview and the real recording stays
 hidden until it is started, so the first <kbd>1</kbd> presses Loom's own play
@@ -89,6 +103,8 @@ transcript (Loom, YouTube) un-blur once every segment in them is finished.
 - `src/blur.ts` – what gets blurred
 - `src/inline.ts` – blanks inside the site's own transcript lines
 - `src/panel.ts` – the panel (shadow DOM; swallows key events so the site's player shortcuts don't fire)
+- `src/ui.tsx` – the panel's selects, checkboxes and key settings (Radix primitives, menus portalled into the shadow DOM)
+- `src/keys.ts` – the learner's shortcut keys
 - `src/content.ts` / `src/background.ts` – entry points
 
 `npm test` at the root runs the core tests. The build bundles each entry into one IIFE

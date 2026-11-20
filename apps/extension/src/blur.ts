@@ -14,6 +14,8 @@ const BLUR_TARGETS = [
   'transcript-segment-view-model > [role="text"]',
   'transcript-segment-view-model > .ytAttributedStringHost',
   '.ytp-caption-window-container',
+  // Microsoft Stream (Teams recordings on SharePoint / OneDrive)
+  '#OneTranscript [data-transcript-copy-field="text"]',
   // Anything that calls itself a transcript or captions (Zoom, Teams/Stream, Drive, Vimeo, LMS players)
   ':is([class*="transcript" i], [id*="transcript" i], [data-testid*="transcript" i], [aria-label*="transcript" i]) :is(p, span, div, li):not(:has(*)):not(:is(button, [role="tab"], [data-testid^="sidebar-tab"], [data-testid^="transcript-row-"], ytd-transcript-segment-renderer, transcript-segment-view-model) *)',
   ':is([class*="caption" i], [class*="subtitle" i], [class*="closed-caption" i]):not(:has(video)):not(video):not(button):not(figcaption)',

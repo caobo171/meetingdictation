@@ -18,6 +18,7 @@ import {
   detectSource,
   findVideo,
   isLoom,
+  isStream,
   isYouTube,
   openSiteTranscript,
   transcriptLines,
@@ -29,6 +30,8 @@ import {
   type Source,
 } from './sources';
 import { accountEmail, onAuthChange, openConnect, pullProgress, pushProgress } from './sync';
+import { actionFor, isTypeThrough, keyCaps, keys, loadKeys, onKeysChange, saveKeys, type KeyAction } from './keys';
+import { mountCheckbox, mountSelect, mountSettings } from './ui';
 
 /**
  * YouTube enforces Trusted Types; a plain innerHTML assignment can throw there.
@@ -134,8 +137,13 @@ const storage = {
 };
 
 function pageKey(): string {
-  const id = isYouTube() ? youTubeVideoId() : null;
-  return `md:${location.host}${location.pathname}${id ? `?v=${id}` : ''}`;
+  if (isYouTube()) {
+    const id = youTubeVideoId();
+    return `md:${location.host}${location.pathname}${id ? `?v=${id}` : ''}`;
+  }
+  // Every Stream video is the same stream.aspx page; the file is its ?id=.
+  const streamId = isStream() ? new URL(location.href).searchParams.get('id') : null;
+  return `md:${location.host}${location.pathname}${streamId ? `?id=${streamId}` : ''}`;
 }
 
 function fmt(t: number): string {
@@ -153,6 +161,7 @@ function pageTitle(): string {
 function siteName(): string {
   if (/(^|\.)loom\.com$/.test(location.hostname)) return 'loom';
   if (/(^|\.)youtube\.com$/.test(location.hostname)) return 'youtube';
+  if (isStream()) return 'stream';
   return location.hostname.replace(/^www\./, '');
 }
 
@@ -168,7 +177,8 @@ const STYLE = `
 header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #4f46e5; color: #fff; cursor: move; user-select: none; }
 header .title { font-weight: 700; }
 header .src { opacity: .8; font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-header button { background: rgba(255,255,255,.18); color: #fff; border: 0; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 15px; line-height: 1; }
+header button { background: rgba(255,255,255,.18); color: #fff; border: 0; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+header button.on { background: rgba(255,255,255,.34); }
 .body { padding: 12px; display: grid; gap: 10px; }
 .bar { height: 6px; background: #eef0f6; border-radius: 3px; overflow: hidden; }
 .bar > div { height: 100%; background: #22c55e; width: 0; transition: width .3s; }
@@ -181,7 +191,33 @@ button.b.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; font
 button.b.primary:hover { background: #4338ca; }
 button.b.on { background: #e0e7ff; border-color: #a5b4fc; }
 button.b:disabled { opacity: .45; cursor: default; }
-select { border: 1px solid #d9dce8; border-radius: 8px; padding: 5px 4px; font: inherit; font-size: 13px; background: #fff; color: #1f2333; }
+button.sel { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d9dce8; border-radius: 8px; padding: 5px 8px 5px 10px; font: inherit; font-size: 13px; background: #fff; color: #1f2333; cursor: pointer; outline: none; }
+button.sel:hover { background: #f7f8fc; }
+button.sel:focus-visible, button.sel[data-state="open"] { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99, 102, 241, .18); }
+.sel-icon { display: inline-flex; color: #7a7f93; }
+.sel-menu { z-index: 2147483647; min-width: var(--radix-select-trigger-width); background: #fff; border: 1px solid #e3e5ee; border-radius: 10px; box-shadow: 0 10px 30px rgba(20, 24, 50, .18); padding: 4px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2333; }
+.sel-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 8px; border-radius: 6px; cursor: pointer; outline: none; user-select: none; }
+.sel-item[data-highlighted] { background: #eef0ff; color: #3730a3; }
+.sel-item[data-state="checked"] { font-weight: 600; }
+.sel-tick { display: inline-flex; color: #4f46e5; }
+.check { display: inline-flex; align-items: center; gap: 7px; }
+.check label { cursor: pointer; }
+button.check-box { all: unset; box-sizing: border-box; width: 16px; height: 16px; border: 1.5px solid #b9bdd0; border-radius: 4px; background: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+button.check-box:focus-visible { box-shadow: 0 0 0 3px rgba(99, 102, 241, .25); }
+button.check-box[data-state="checked"] { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.check-tick { display: inline-flex; }
+.settings { display: grid; gap: 10px; }
+.settings-head { display: flex; align-items: center; justify-content: space-between; }
+.settings-note { margin: 0; font-size: 12px; color: #5d6276; }
+.keylist { display: grid; gap: 2px; }
+.keyrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 5px 2px; border-bottom: 1px solid #f0f1f6; font-size: 13px; }
+.keyrow.fixed { color: #7a7f93; }
+button.keybtn { min-width: 96px; display: inline-flex; justify-content: center; align-items: center; gap: 2px; border: 1px solid #d9dce8; border-radius: 8px; padding: 4px 8px; background: #f7f8fc; font: inherit; font-size: 12px; color: #1f2333; cursor: pointer; outline: none; }
+button.keybtn:hover { background: #eef0f8; }
+button.keybtn.listening { border-color: #6366f1; background: #eef0ff; color: #4338ca; box-shadow: 0 0 0 3px rgba(99, 102, 241, .18); }
+.keyfixed { min-width: 96px; text-align: center; }
+.keyerr { grid-column: 1 / -1; font-size: 12px; color: #c2410c; }
+.plus { margin: 0 2px; color: #9aa0b4; }
 .play { min-width: 92px; }
 textarea { width: 100%; min-height: 76px; resize: vertical; border: 2px solid #d9dce8; border-radius: 10px; padding: 9px 10px; font: inherit; font-size: 15px; color: #1f2333; background: #fff; outline: none; }
 textarea:focus { border-color: #818cf8; }
@@ -205,11 +241,16 @@ footer a:hover { text-decoration: underline; }
 footer .acct { flex-basis: 100%; }
 footer .acct b { color: #15803d; font-weight: 600; }
 .keys { font-size: 11.5px; color: #7a7f93; }
+.keygrid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 5px 8px; margin: 8px 0 0; font-size: 12px; align-items: center; }
+.keygrid dt { white-space: nowrap; text-align: right; }
+.keygrid dd { margin: 0; color: #7a7f93; }
 kbd { font: 11px ui-monospace, monospace; background: #f1f2f7; border: 1px solid #dfe1ea; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
 .pill { display: flex; align-items: center; gap: 8px; background: #4f46e5; color: #fff; border: 0; border-radius: 999px; padding: 9px 14px; font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-shadow: 0 6px 20px rgba(20,24,50,.25); cursor: pointer; }
 .msg { padding: 6px 2px; color: #5d6276; }
 .msg strong { color: #1f2333; }
 .hidden { display: none !important; }
+.body.in-settings > :not([data-ref="settings"]) { display: none !important; }
+.keys a { color: #4f46e5; cursor: pointer; }
 .wrap.typing { right: auto; left: 20px; }
 .wrap.typing .keys, .wrap.typing [data-act="check"], .wrap.typing .result, .wrap.typing textarea { display: none; }
 @media (prefers-color-scheme: dark) {
@@ -221,7 +262,14 @@ kbd { font: 11px ui-monospace, monospace; background: #f1f2f7; border: 1px solid
   button.b { background: #262938; border-color: #393d50; color: #e7e9f3; }
   button.b:hover { background: #2f3345; }
   button.b.on { background: #312e81; border-color: #6366f1; }
-  select, textarea { background: #151720; border-color: #393d50; color: #e7e9f3; }
+  textarea, button.sel, button.keybtn { background: #151720; border-color: #393d50; color: #e7e9f3; }
+  button.sel:hover, button.keybtn:hover { background: #1f2230; }
+  .sel-menu { background: #1c1e29; border-color: #2f3242; color: #e7e9f3; }
+  .sel-item[data-highlighted] { background: #312e81; color: #e0e7ff; }
+  button.check-box { background: #151720; border-color: #4b4f66; }
+  .keyrow { border-color: #2a2d3b; }
+  .settings-note { color: #a3a8bd; }
+  button.keybtn.listening { background: #312e81; color: #e0e7ff; }
   footer { border-color: #2a2d3b; }
   kbd { background: #262938; border-color: #393d50; color: #e7e9f3; }
   .result .ok { color: #4ade80; } .result .ans { color: #f87171; } .result .wrong { color: #f87171; }
@@ -238,10 +286,12 @@ const TEMPLATE = `
     <header data-ref="head">
       ${MARK}<span class="title">MeetingDictation</span>
       <span class="src" data-ref="src"></span>
+      <button data-act="settings" title="Shortcut keys" data-ref="gear"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4L10.7 6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
       <button data-act="collapse" title="Minimise">–</button>
       <button data-act="close" title="Close and un-blur">×</button>
     </header>
-    <div class="body">
+    <div class="body" data-ref="body">
+      <div data-ref="settings" class="hidden"></div>
       <div data-ref="status" class="msg">Looking for the transcript…</div>
       <div data-ref="main" class="hidden" style="display:grid;gap:10px">
         <div class="bar"><div data-ref="bar"></div></div>
@@ -253,16 +303,12 @@ const TEMPLATE = `
           <button class="b" data-act="fwd" title="Forward 2 s (3)">+2s</button>
           <button class="b" data-act="next" title="Next segment (Alt+→)">⏭</button>
           <button class="b" data-act="loop" title="Loop segment (Alt+L)">🔁</button>
-          <select data-ref="ratio" class="hidden" title="How many words are blanks">
-            <option value="1">Blanks 100%</option><option value="0.75">Blanks 75%</option>
-            <option value="0.5">Blanks 50%</option><option value="0.25">Blanks 25%</option>
-          </select>
-          <select data-ref="rate" title="Speed">
-            <option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="0.9">0.9×</option>
-            <option value="1" selected>1×</option><option value="1.25">1.25×</option>
-          </select>
+          <span data-ref="ratio" class="hidden"></span>
+          <span data-ref="rate"></span>
         </div>
-        <div class="msg hidden" data-ref="typeHelp">Type in the blanks in the transcript. <kbd>Space</kbd> next word · <kbd>Enter</kbd> check · <kbd>1</kbd> play</div>
+        <div class="msg hidden" data-ref="typeHelp">Type in the blanks in the transcript.
+          <dl class="keygrid" data-ref="keygrid"></dl>
+        </div>
         <textarea data-ref="input" spellcheck="false" autocomplete="off" placeholder="Type what you hear…  (1 = play, Enter = check)"></textarea>
         <div class="verdict bad hidden" data-ref="note"></div>
         <div class="verdict" data-ref="verdict"></div>
@@ -274,12 +320,12 @@ const TEMPLATE = `
           <span class="spacer"></span>
           <button class="b" data-act="here" title="Go to the segment at the video's current time">⌖ Here</button>
         </div>
-        <div class="keys"><kbd>1</kbd> play <kbd>2</kbd>/<kbd>3</kbd> ±2s <kbd>Enter</kbd> check · next <kbd>Alt</kbd>+<kbd>H</kbd> hint <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> move</div>
+        <div class="keys" data-ref="keyline"></div>
       </div>
     </div>
     <footer>
-      <label><input type="checkbox" data-ref="blur" checked> Blur transcript &amp; captions</label>
-      <label class="hidden" data-ref="typeInWrap" title="Turn the transcript next to the video into blanks you type in"><input type="checkbox" data-ref="typeIn" checked> Type in the transcript</label>
+      <span data-ref="blur"></span>
+      <span class="hidden" data-ref="typeInWrap"></span>
       <span><a data-act="load">Load .vtt / .srt</a> · <a data-act="reset">Restart</a></span>
       <span class="acct" data-ref="acct"></span>
       <input type="file" data-ref="file" accept=".vtt,.srt,.txt,text/vtt" class="hidden">
@@ -299,6 +345,11 @@ export class DictationPanel {
   private loop = false;
   private rate = 1;
   private blur = true;
+  private rateSel!: ReturnType<typeof mountSelect>;
+  private ratioSel!: ReturnType<typeof mountSelect>;
+  private blurBox!: ReturnType<typeof mountCheckbox>;
+  private typeInBox!: ReturnType<typeof mountCheckbox>;
+  private settings: ReturnType<typeof mountSettings> | null = null;
   private key = pageKey();
   private stopAt: number | null = null;
   private raf = 0;
@@ -324,9 +375,7 @@ export class DictationPanel {
         this.check();
         this.focus();
       },
-      togglePlay: () => this.togglePlay(),
-      nudge: (d) => this.nudge(d),
-      act: (name) => this.act(name),
+      key: (action) => this.runKey(action),
     },
     (i) => this.lineState(i),
     typeableLines,
@@ -348,25 +397,55 @@ export class DictationPanel {
       if (act) this.act(act);
     });
     this.refs.pill.addEventListener('click', () => this.open());
+    // The keys work wherever the focus is, not only in a blank: clicking the video moves
+    // focus to the page, and the site's player would take 1/2/3 (YouTube jumps to 10/20/30%).
+    window.addEventListener('keydown', (e) => this.onPageKey(e), true);
     this.refs.input.addEventListener('keydown', (e) => this.onKey(e as KeyboardEvent));
-    this.refs.rate.addEventListener('change', () => {
-      this.rate = Number((this.refs.rate as HTMLSelectElement).value);
-      if (this.video) this.video.playbackRate = this.rate;
-      void this.save();
+    const portal = this.root.querySelector<HTMLElement>('.wrap')!;
+    this.rateSel = mountSelect(this.refs.rate, portal, {
+      title: 'Speed',
+      value: '1',
+      options: ['0.5', '0.75', '0.9', '1', '1.25'].map((v) => ({ value: v, label: `${v}×` })),
+      onChange: (v) => {
+        this.rate = Number(v);
+        if (this.video) this.video.playbackRate = this.rate;
+        void this.save();
+        this.focus();
+      },
     });
-    this.refs.blur.addEventListener('change', () => {
-      this.blur = (this.refs.blur as HTMLInputElement).checked;
-      setBlur(this.blur, this.video);
-      void this.save();
+    this.ratioSel = mountSelect(this.refs.ratio, portal, {
+      title: 'How many words are blanks',
+      value: '1',
+      options: RATIOS.map((v) => ({ value: String(v), label: `Blanks ${v * 100}%` })),
+      onChange: (v) => {
+        setRatioPref(Number(v));
+        this.inline.setRatio(Number(v));
+        if (this.typing) this.lineVerdict(this.results[this.index]);
+        this.focus();
+      },
+    });
+    this.blurBox = mountCheckbox(this.refs.blur, {
+      label: 'Blur transcript & captions',
+      checked: true,
+      onChange: (on) => {
+        this.blur = on;
+        setBlur(this.blur, this.video);
+        void this.save();
+      },
+    });
+    this.typeInBox = mountCheckbox(this.refs.typeInWrap, {
+      label: 'Type in the transcript',
+      title: 'Turn the transcript next to the video into blanks you type in',
+      checked: true,
+      onChange: (on) => void this.switchTypeIn(on),
     });
     this.refs.file.addEventListener('change', () => void this.loadFile());
-    this.refs.ratio.addEventListener('change', () => {
-      const v = Number((this.refs.ratio as HTMLSelectElement).value);
-      setRatioPref(v);
-      this.inline.setRatio(v);
-      if (this.typing) this.lineVerdict(this.results[this.index]);
+    this.drawKeyHelp();
+    onKeysChange(() => {
+      this.drawKeyHelp();
+      this.settings?.set(keys());
     });
-    this.refs.typeIn.addEventListener('change', () => void this.switchTypeIn((this.refs.typeIn as HTMLInputElement).checked));
+    void loadKeys();
     this.makeDraggable();
     void this.refreshAccount();
     onAuthChange(() => {
@@ -406,7 +485,7 @@ export class DictationPanel {
     this.typeIn = await typeInPref();
     const hasList = isLoom() || isYouTube();
     this.refs.typeInWrap.classList.toggle('hidden', !hasList);
-    (this.refs.typeIn as HTMLInputElement).checked = this.typeIn;
+    this.typeInBox.set(this.typeIn);
     if (hasList && this.typeIn && (await this.startTyping())) return;
     const source = await detectSource(this.video);
     if (!source) {
@@ -445,7 +524,7 @@ export class DictationPanel {
     if (on) {
       if (await this.startTyping()) return;
       this.typeIn = false;
-      (this.refs.typeIn as HTMLInputElement).checked = false;
+      this.typeInBox.set(false);
       this.note('This page has no transcript list to type in.');
       return;
     }
@@ -500,8 +579,8 @@ export class DictationPanel {
       this.results = mergeResults(this.results, remote.results);
       if (!saved || saved.fp !== fp) this.index = Math.min(remote.index, this.segments.length - 1);
     }
-    (this.refs.rate as HTMLSelectElement).value = String(this.rate);
-    (this.refs.blur as HTMLInputElement).checked = this.blur;
+    this.rateSel.set(String(this.rate));
+    this.blurBox.set(this.blur);
     setBlur(this.blur, this.video);
     this.refs.status.classList.add('hidden');
     this.refs.main.classList.remove('hidden');
@@ -512,7 +591,7 @@ export class DictationPanel {
     this.refs.ratio.classList.toggle('hidden', !this.typing);
     if (this.typing) {
       const ratio = await ratioPref();
-      (this.refs.ratio as HTMLSelectElement).value = String(ratio);
+      this.ratioSel.set(String(ratio));
       this.inline.setRatio(ratio);
     }
     if (this.typing) this.inline.attach(this.lines);
@@ -914,6 +993,7 @@ export class DictationPanel {
         }
         break;
       case 'connect': openConnect(); break;
+      case 'settings': this.toggleSettings(); return;
       case 'collapse': this.collapse(true); break;
       case 'close': this.close(); break;
       default: return;
@@ -924,31 +1004,89 @@ export class DictationPanel {
   private onKey(e: KeyboardEvent): void {
     if (e.isComposing) return;
     const input = e.target as HTMLTextAreaElement;
-    const controlDigit = e.key === '1' || e.key === '2' || e.key === '3';
-    if (controlDigit && (e.ctrlKey || e.metaKey)) {
+    if (isTypeThrough(e)) {
       e.preventDefault();
       input.setRangeText(e.key, input.selectionStart, input.selectionEnd, 'end');
       return;
     }
-    if (controlDigit && !e.altKey && !e.shiftKey) {
+    const action = actionFor(e);
+    if (action) {
       e.preventDefault();
-      if (e.key === '1') this.togglePlay();
-      else this.nudge(e.key === '2' ? -NUDGE : NUDGE);
+      this.runKey(action);
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       this.check();
-      return;
     }
-    if (e.altKey) {
-      const map: Record<string, string> = { KeyH: 'hint', KeyA: 'answer', KeyL: 'loop', ArrowLeft: 'prev', ArrowRight: 'next' };
-      const act = map[e.code];
-      if (act) {
-        e.preventDefault();
-        this.act(act);
-      }
+  }
+
+  /** One of the learner's shortcut keys, wherever it was pressed. */
+  runKey(action: KeyAction): void {
+    this.act(action === 'forward' ? 'fwd' : action);
+  }
+
+  /** Panel keys pressed while the focus is on the page itself (the video, empty space). */
+  private onPageKey(e: KeyboardEvent): void {
+    if (!this.isOpen || !this.segments.length || e.isComposing) return;
+    const target = e.target as HTMLElement | null;
+    if (target === this.host || target?.closest?.('.md-line')) return; // handled there
+    if (target?.closest?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return; // the site's own fields
+    const action = actionFor(e);
+    if (!action) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    this.runKey(action);
+  }
+
+  /** The key list under the controls and the buttons' tooltips, from the learner's keys. */
+  private drawKeyHelp(): void {
+    const k = keys();
+    const cap = (combo: string) => keyCaps(combo).map((c) => `<kbd>${esc(c)}</kbd>`).join('+');
+    const rows: [string, string][] = [
+      [cap(k.play), 'play / pause'],
+      [`${cap(k.back)} ${cap(k.forward)}`, 'back / forward 2 s'],
+      ['<kbd>Enter</kbd>', 'check, then next line'],
+      ['<kbd>Space</kbd>', 'next word'],
+      [`${cap(k.prev)} ${cap(k.next)}`, 'previous / next line'],
+      [cap(k.loop), 'loop the line'],
+      [cap(k.hint), 'hint'],
+      [cap(k.answer), 'show answer'],
+    ];
+    setHTML(this.refs.keygrid, rows.map(([keysHtml, what]) => `<dt>${keysHtml}</dt><dd>${what}</dd>`).join(''));
+    setHTML(
+      this.refs.keyline,
+      `${cap(k.play)} play ${cap(k.back)}/${cap(k.forward)} ±2s <kbd>Enter</kbd> check · next ${cap(k.hint)} hint ${cap(k.prev)}/${cap(k.next)} move · <a data-act="settings">change keys</a>`,
+    );
+    const plain = (combo: string) => keyCaps(combo).join('+');
+    const titles: Record<string, string> = {
+      prev: `Previous segment (${plain(k.prev)})`,
+      play: `Play / pause segment (${plain(k.play)})`,
+      back: `Back 2 s (${plain(k.back)})`,
+      fwd: `Forward 2 s (${plain(k.forward)})`,
+      next: `Next segment (${plain(k.next)})`,
+      loop: `Loop segment (${plain(k.loop)})`,
+      hint: plain(k.hint),
+      answer: plain(k.answer),
+    };
+    for (const [act, title] of Object.entries(titles)) {
+      this.root.querySelectorAll<HTMLElement>(`button[data-act="${act}"]`).forEach((b) => (b.title = title));
     }
+    (this.refs.input as HTMLTextAreaElement).placeholder = `Type what you hear…  (${plain(k.play)} = play, Enter = check)`;
+  }
+
+  private toggleSettings(show = this.refs.settings.classList.contains('hidden')): void {
+    if (show && !this.settings) {
+      this.settings = mountSettings(this.refs.settings, {
+        keys: keys(),
+        onSave: (map) => saveKeys(map),
+        onClose: () => this.toggleSettings(false),
+      });
+    }
+    this.refs.settings.classList.toggle('hidden', !show);
+    this.refs.gear.classList.toggle('on', show);
+    this.refs.body.classList.toggle('in-settings', show);
+    if (!show) this.focus();
   }
 
   private focus(): void {

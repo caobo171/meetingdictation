@@ -6,7 +6,7 @@
  *
  *   Space / Tab   next blank        Backspace on an empty blank   previous one
  *   Enter         check the line; Enter on a finished line plays the next one
- *   1 / 2 / 3     play the line, back / forward 2 s (Ctrl/⌘ + digit types it)
+ *   1 / 2 / 3     play the line, back / forward 2 s (the learner can change these in settings)
  *   Alt+H hint    Alt+A answer      Alt+← / Alt+→ previous / next line
  *
  * The site's own text element is hidden, not removed, and the blanks sit next
@@ -16,15 +16,15 @@
 
 import { blankParts, wordMatches, type BlankPart } from '@md/core';
 import type { TranscriptLine } from './sources';
+import { actionFor, isTypeThrough, type KeyAction } from './keys';
 
 export interface BlankHost {
   /** The learner moved into line i (click or keyboard). */
   select(i: number): void;
   /** Enter on line i. */
   check(i: number): void;
-  togglePlay(): void;
-  nudge(delta: number): void;
-  act(name: 'hint' | 'answer' | 'prev' | 'next' | 'loop'): void;
+  /** One of the learner's shortcut keys (play, hint, …). */
+  key(action: KeyAction): void;
 }
 
 export interface LineState {
@@ -439,33 +439,21 @@ export class InlineBlanks {
     const caretStart = input.selectionStart === 0 && input.selectionEnd === 0;
     const caretEnd = input.selectionStart === input.value.length;
 
-    const digit = e.key === '1' || e.key === '2' || e.key === '3';
-    if (digit && (e.ctrlKey || e.metaKey)) {
+    if (isTypeThrough(e)) {
       e.preventDefault();
       input.setRangeText(e.key, input.selectionStart ?? 0, input.selectionEnd ?? 0, 'end');
       this.onInput(input, i);
       return;
     }
-    if (digit && !e.altKey && !e.shiftKey) {
+    const action = actionFor(e);
+    if (action) {
       e.preventDefault();
-      if (e.key === '1') this.host.togglePlay();
-      else this.host.nudge(e.key === '2' ? -2 : 2);
+      this.host.key(action);
       return;
     }
     if (e.key === 'Enter') {
       e.preventDefault();
       this.host.check(i);
-      return;
-    }
-    if (e.altKey) {
-      const map: Record<string, 'hint' | 'answer' | 'loop' | 'prev' | 'next'> = {
-        KeyH: 'hint', KeyA: 'answer', KeyL: 'loop', ArrowLeft: 'prev', ArrowRight: 'next',
-      };
-      const act = map[e.code];
-      if (act) {
-        e.preventDefault();
-        this.host.act(act);
-      }
       return;
     }
     const move = (to: number, atEnd: boolean) => {
@@ -490,11 +478,11 @@ export class InlineBlanks {
     if (e.key === 'ArrowRight' && caretEnd && !e.shiftKey && move(k + 1, false)) e.preventDefault();
     if (e.key === 'ArrowUp' && i > 0) {
       e.preventDefault();
-      this.host.act('prev');
+      this.host.key('prev');
     }
     if (e.key === 'ArrowDown' && i + 1 < this.lines.length) {
       e.preventDefault();
-      this.host.act('next');
+      this.host.key('next');
     }
   }
 }

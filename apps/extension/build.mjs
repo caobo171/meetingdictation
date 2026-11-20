@@ -8,7 +8,12 @@ const options = {
   format: 'iife', // content scripts are not ES modules
   target: 'chrome110',
   logLevel: 'info',
-  define: { __MD_APP_URL__: JSON.stringify(process.env.MD_APP_URL ?? 'http://localhost:4100') },
+  jsx: 'automatic',
+  minify: !watch, // React makes the content script ~560 KB unminified; it loads on every Loom / YouTube page
+  define: {
+    __MD_APP_URL__: JSON.stringify(process.env.MD_APP_URL ?? 'http://localhost:4100'),
+    'process.env.NODE_ENV': '"production"', // React's production build
+  },
 };
 
 if (watch) {
