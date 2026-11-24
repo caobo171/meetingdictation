@@ -39,22 +39,22 @@ model Recording {
 
 /// Dictation progress on one recording, from the website ("web:<recordingId>") or the extension (page key).
 model Progress {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  key         String
-  title       String
-  url         String?
-  source      String // "web" | "extension"
-  site        String?
-  fp          String
-  total       Int
-  index       Int      @default(0)
-  results     String   @default("{}") // JSON Record<number, Result>
-  done        Int      @default(0)
-  scoreAvg    Float    @default(0)
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  title     String
+  url       String?
+  source    String // "web" | "extension"
+  site      String?
+  fp        String
+  total     Int
+  index     Int      @default(0)
+  results   String   @default("{}") // JSON Record<number, Result>
+  done      Int      @default(0)
+  scoreAvg  Float    @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 
   @@unique([userId, key])
 }
@@ -81,4 +81,20 @@ model ExtToken {
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
   revokedAt  DateTime?
+}
+
+/// One-time sign-in codes sent by email. Only the sha256 of the code is stored, salted with the row id.
+/// The newest unused code for an address is the only one that can be redeemed.
+model LoginCode {
+  id        String    @id @default(cuid())
+  email     String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
 }

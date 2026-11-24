@@ -32,6 +32,10 @@ Load the extension: `chrome://extensions` → Developer mode → **Load unpacked
   once `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` are set; the redirect URI is
   `<AUTH_URL>/api/auth/callback/google`. A Google sign-in joins the email
   account with the same address.
+- **Email code**: a 6-digit code mailed through Amazon SES. It expires in 10
+  minutes, allows 5 tries, and only the newest code works; at most 5 codes per
+  address and 20 per IP an hour. A first sign-in by code creates the account.
+  Without SES keys (development) the code is printed to the server console.
 - **The extension** never sees a password. `/extension/connect` pings the
   extension's content script, mints a random `mdx_…` token only after it
   answers, and hands it over with `postMessage` to the same origin. The server
@@ -64,6 +68,9 @@ which drives the streak and chart.
 - **Database**: PostgreSQL. Production uses the database `meetingdictation`
   (its own role) in the shared `landing-postgres-1` container on wele_eu,
   `127.0.0.1:5433`. `script.sh` runs `prisma db push` on every deploy.
+- **Email**: SES in `ap-southeast-1`, domain identity `meetingdictation.com`
+  with Easy DKIM and MAIL FROM `mail.meetingdictation.com` (DNS records in
+  Cloudflare). Mail leaves from `no-reply@meetingdictation.com`.
 - **Uploads** go to `UPLOAD_DIR` on local disk. Use a persistent volume, or
   move them to S3 before running more than one instance.
 - **Domain**: the extension trusts `http://localhost:4100` and

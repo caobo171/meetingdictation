@@ -1,8 +1,8 @@
 'use client';
 
-import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, EnvelopeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { startTransition, useActionState, type FormEvent } from 'react';
+import { startTransition, useActionState, useState, type FormEvent } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 import { googleAction, loginAction, signupAction, type FormState } from './actions';
+import { CodeForm } from './CodeForm';
 
 function Submit({ label, pending }: { label: string; pending: boolean }) {
   return (
@@ -30,6 +31,7 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
     startTransition(() => action(data));
   };
   const signup = mode === 'signup';
+  const [withCode, setWithCode] = useState(false);
 
   return (
     <div>
@@ -58,37 +60,49 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
         </div>
       )}
 
-      <form action={action} onSubmit={submit} className={`space-y-4 ${google ? '' : 'mt-6'}`}>
-        <input type="hidden" name="next" value={next ?? ''} />
-        {signup && (
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" autoComplete="name" required />
-          </div>
-        )}
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required />
+      {withCode ? (
+        <div className={google ? '' : 'mt-6'}>
+          <CodeForm next={next} onUsePassword={() => setWithCode(false)} />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete={signup ? 'new-password' : 'current-password'}
-            minLength={signup ? 8 : undefined}
-            required
-          />
-        </div>
-        {state?.error && (
-          <Alert variant="destructive">
-            <ExclamationTriangleIcon />
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
-        )}
-        <Submit label={signup ? 'Create account' : 'Sign in'} pending={pending} />
-      </form>
+      ) : (
+        <>
+          <form action={action} onSubmit={submit} className={`space-y-4 ${google ? '' : 'mt-6'}`}>
+            <input type="hidden" name="next" value={next ?? ''} />
+            {signup && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" name="name" autoComplete="name" required />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={signup ? 'new-password' : 'current-password'}
+                minLength={signup ? 8 : undefined}
+                required
+              />
+            </div>
+            {state?.error && (
+              <Alert variant="destructive">
+                <ExclamationTriangleIcon />
+                <AlertDescription>{state.error}</AlertDescription>
+              </Alert>
+            )}
+            <Submit label={signup ? 'Create account' : 'Sign in'} pending={pending} />
+          </form>
+          <Button type="button" variant="outline" className="mt-3 w-full" onClick={() => setWithCode(true)}>
+            <EnvelopeIcon />
+            {signup ? 'Sign up with an email code' : 'Email me a sign-in code'}
+          </Button>
+        </>
+      )}
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {signup ? 'Already have an account? ' : 'New here? '}
