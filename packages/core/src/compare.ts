@@ -224,6 +224,49 @@ export function hasWords(text: string): boolean {
   return tokenize(text).some((t) => t.units.length > 0);
 }
 
+/**
+ * Words shown rather than asked for in the blanks: interjections and the
+ * linking "then". Grading never needs them either way.
+ */
+export const SHOWN_WORDS = new Set(['hi', 'hello', 'hey', 'hiya', 'oh', 'ooh', 'wow', 'yeah', 'yep', 'yup', 'then']);
+
+/** Greetings and meeting small talk: "Hi, Mark.", "How are you?", "Can you see my screen?" */
+const SMALL_TALK = new Set([
+  ...SHOWN_WORDS,
+  'howdy', 'good', 'morning', 'afternoon', 'evening', 'day', 'bye', 'goodbye', 'see', 'ya', 'later', 'soon',
+  'thanks', 'thank', 'you', 'cheers', 'welcome', 'nice', 'to', 'meet', 'again', 'how', 'are', 'is', 'it', 'going',
+  'doing', "how's", "it's", 'everyone', 'everybody', 'all', 'guys', 'folks', 'team', 'yes', 'no', 'nope', 'ok',
+  'okay', 'alright', 'right', 'sure', 'cool', 'great', 'awesome', 'fine', 'good', 'too', 'and', 'i', "i'm", 'am',
+  'so', 'well', 'sorry', 'can', 'hear', 'me', 'my', 'screen', 'there', 'just', 'a', 'sec', 'second', 'one',
+  'moment', 'nice', 'much', 'very', 'very', 'the', 'thats', "that's", 'perfect', 'lovely', 'hello',
+]);
+
+/**
+ * A line that is only a greeting or small talk, with names allowed alongside
+ * a greeting ("Hi, Mark. Hi, Joe."). It is shown, not practised.
+ */
+export function isSmallTalk(text: string): boolean {
+  const words = (text || '').replace(/[’‘]/g, "'").split(/\s+/).map((w) => w.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, '')).filter(Boolean);
+  const spoken = words.filter((w) => unitsOf(w).length > 0);
+  if (!spoken.length) return true; // only "uh", "mm"…
+  if (spoken.length > 10) return false;
+  let greeted = false;
+  let names = 0;
+  for (const [k, w] of spoken.entries()) {
+    const lower = w.toLowerCase();
+    if (SMALL_TALK.has(lower)) {
+      greeted ||= SHOWN_WORDS.has(lower) || /^(morning|afternoon|evening|thanks|thank|bye|goodbye|cheers|welcome)$/.test(lower);
+      continue;
+    }
+    if (k > 0 && /^\p{Lu}\p{Ll}+$/u.test(w)) {
+      names += 1; // a name: "Hi, Mark"
+      continue;
+    }
+    return false;
+  }
+  return names === 0 || greeted;
+}
+
 /** One slot of a transcript line in "type in the blanks" mode. */
 export interface BlankPart {
   /** Punctuation shown as-is before the word. */
@@ -231,7 +274,7 @@ export interface BlankPart {
   /** The word to type; empty when the token is only punctuation. */
   word: string;
   post: string;
-  /** "uh", "um"…: shown, never asked for. */
+  /** "uh", "um", "hi", "then"…: shown, never asked for. */
   filler: boolean;
 }
 
@@ -244,7 +287,7 @@ export function blankParts(text: string): BlankPart[] {
     .map((tok) => {
       const m = tok.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}%]*)$/u)!;
       const word = m[2];
-      return { pre: m[1], word, post: m[3], filler: !!word && unitsOf(word).length === 0 };
+      return { pre: m[1], word, post: m[3], filler: !!word && (unitsOf(word).length === 0 || SHOWN_WORDS.has(normalizeWord(word))) };
     });
 }
 

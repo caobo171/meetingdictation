@@ -21,10 +21,10 @@ export function LogoMark({ size = 32, className = '' }: { size?: number; classNa
 
 export function Logo({ size = 32 }: { size?: number }) {
   return (
-    <span className="inline-flex items-center gap-2.5">
+    <span className="inline-flex items-center gap-2">
       <LogoMark size={size} />
-      <span className="font-extrabold tracking-tight text-ink" style={{ fontSize: size * 0.56 }}>
-        Meeting<span className="text-brand">Dictation</span>
+      <span className="font-semibold tracking-tight text-foreground" style={{ fontSize: size * 0.58 }}>
+        Meeting<span className="text-primary">Dictation</span>
       </span>
     </span>
   );

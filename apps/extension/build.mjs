@@ -2,7 +2,7 @@ import * as esbuild from 'esbuild';
 
 const watch = process.argv.includes('--watch');
 const options = {
-  entryPoints: { content: 'src/content.ts', background: 'src/background.ts', connect: 'src/connect.content.ts' },
+  entryPoints: { content: 'src/content.ts', background: 'src/background.ts', connect: 'src/connect.content.ts', frame: 'src/frame.ts' },
   outdir: 'dist',
   bundle: true,
   format: 'iife', // content scripts are not ES modules

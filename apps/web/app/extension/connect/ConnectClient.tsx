@@ -1,7 +1,10 @@
 'use client';
 
+import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 
 import { createExtensionToken } from '@/app/app/extension/actions';
 
@@ -49,41 +52,59 @@ export function ConnectClient({ email }: { email: string }) {
     };
   }, []);
 
+  const Icon = ({ icon: I, tone }: { icon: typeof CheckCircleIcon; tone: string }) => (
+    <span className={`mx-auto flex size-12 items-center justify-center rounded-full ${tone}`}>
+      <I className="size-6" />
+    </span>
+  );
+
   if (phase === 'done') {
     return (
-      <div>
-        <div className="text-5xl">🎉</div>
-        <h1 className="mt-3 text-2xl font-extrabold">Extension connected</h1>
-        <p className="mt-2 text-ink-2">Practice on Loom and YouTube now syncs to <b>{email}</b>. You can close this tab.</p>
-        <Link href="/app" className="btn-primary mt-6">Go to dashboard</Link>
+      <div className="space-y-2">
+        <Icon icon={CheckCircleIcon} tone="bg-success-soft text-success" />
+        <h1 className="pt-2 text-xl font-semibold tracking-tight">Extension connected</h1>
+        <p className="text-sm text-muted-foreground">
+          Practice in the extension now syncs to <span className="font-medium text-foreground">{email}</span>. You can close this tab.
+        </p>
+        <div className="pt-4">
+          <Button asChild>
+            <Link href="/app">Go to dashboard</Link>
+          </Button>
+        </div>
       </div>
     );
   }
   if (phase === 'missing') {
     return (
-      <div>
-        <div className="text-5xl">🧩</div>
-        <h1 className="mt-3 text-2xl font-extrabold">We can’t see the extension</h1>
-        <p className="mt-2 text-ink-2">Install it in this browser first, then reload this page.</p>
-        <div className="mt-6 flex justify-center gap-2">
-          <Link href="/app/extension" className="btn-ghost">How to install</Link>
-          <button className="btn-primary" onClick={() => location.reload()}>Try again</button>
+      <div className="space-y-2">
+        <Icon icon={PuzzlePieceIcon} tone="bg-muted text-muted-foreground" />
+        <h1 className="pt-2 text-xl font-semibold tracking-tight">We can’t see the extension</h1>
+        <p className="text-sm text-muted-foreground">Install it in this browser, or reload it in chrome://extensions, then try again.</p>
+        <div className="flex justify-center gap-2 pt-4">
+          <Button asChild variant="outline">
+            <Link href="/app/extension">How to install</Link>
+          </Button>
+          <Button onClick={() => location.reload()}>Try again</Button>
         </div>
       </div>
     );
   }
   if (phase === 'error') {
     return (
-      <div>
-        <h1 className="text-2xl font-extrabold">Something went wrong</h1>
-        <button className="btn-primary mt-6" onClick={() => location.reload()}>Try again</button>
+      <div className="space-y-2">
+        <Icon icon={ExclamationTriangleIcon} tone="bg-destructive-soft text-destructive" />
+        <h1 className="pt-2 text-xl font-semibold tracking-tight">Something went wrong</h1>
+        <p className="text-sm text-muted-foreground">The extension answered, but connecting it failed.</p>
+        <div className="pt-4">
+          <Button onClick={() => location.reload()}>Try again</Button>
+        </div>
       </div>
     );
   }
   return (
-    <div>
-      <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-brand-soft border-t-brand" />
-      <h1 className="mt-4 text-xl font-extrabold">{phase === 'looking' ? 'Looking for the extension…' : 'Connecting…'}</h1>
+    <div className="space-y-3">
+      <ArrowPathIcon className="mx-auto size-8 animate-spin text-muted-foreground" />
+      <h1 className="text-lg font-semibold tracking-tight">{phase === 'looking' ? 'Looking for the extension…' : 'Connecting…'}</h1>
     </div>
   );
 }

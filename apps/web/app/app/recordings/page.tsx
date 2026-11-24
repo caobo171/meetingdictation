@@ -1,6 +1,10 @@
+import { ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
+import { PageHeader } from '@/components/PageHeader';
 import { ProgressList } from '@/components/ProgressList';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
 
@@ -8,41 +12,65 @@ export const metadata = { title: 'Recordings' };
 
 export default async function Recordings() {
   const user = await requireUser();
-  const [progress, unstarted] = await Promise.all([
+  const [progress, recordings] = await Promise.all([
     db.progress.findMany({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } }),
     db.recording.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }),
   ]);
   const started = new Set(progress.map((p) => p.key));
-  const fresh = unstarted.filter((r) => !started.has(`web:${r.id}`));
+  const fresh = recordings.filter((r) => !started.has(`web:${r.id}`));
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-extrabold tracking-tight">Recordings</h1>
-        <Link href="/app/new" className="btn-primary">➕ New recording</Link>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Recordings"
+        description="Everything you have practised, here and in the extension."
+        action={
+          <Button asChild>
+            <Link href="/app/new">
+              <PlusIcon />
+              New recording
+            </Link>
+          </Button>
+        }
+      />
+
       {fresh.length > 0 && (
-        <div className="card mt-6 p-5">
-          <h2 className="font-bold">Not started yet</h2>
-          <ul className="mt-3 space-y-2">
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>Not started yet</CardTitle>
+            <CardDescription>Uploaded, waiting for your first sentence</CardDescription>
+          </CardHeader>
+          <ul className="divide-y border-t">
             {fresh.map((r) => (
               <li key={r.id}>
-                <Link href={`/app/r/${r.id}`} className="flex items-center justify-between rounded-xl bg-bg2/60 px-4 py-3 hover:bg-bg2">
-                  <span className="font-semibold">{r.title}</span>
-                  <span className="text-sm text-ink-3">{r.segmentCount} sentences →</span>
+                <Link href={`/app/r/${r.id}`} className="group flex items-center justify-between gap-4 px-6 py-3.5 transition-colors hover:bg-muted/50">
+                  <span className="truncate text-sm font-medium">{r.title}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+                    {r.segmentCount} sentences
+                    <ChevronRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
                 </Link>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
-      <div className="card mt-6 overflow-hidden">
+
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>In progress</CardTitle>
+          <CardDescription>{progress.length} {progress.length === 1 ? 'recording' : 'recordings'}</CardDescription>
+        </CardHeader>
         {progress.length ? (
-          <ProgressList items={progress} />
+          <div className="border-t">
+            <ProgressList items={progress} />
+          </div>
         ) : (
-          <p className="p-6 text-ink-2">Nothing practised yet. Start with a new recording, or open a Loom / YouTube video with the extension.</p>
+          <CardContent className="text-sm text-muted-foreground">
+            Nothing practised yet. Start with a new recording, or open a Loom, YouTube or Teams recording with the extension.
+          </CardContent>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

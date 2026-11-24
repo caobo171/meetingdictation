@@ -2,57 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
-/* WELE's warm paper and deep ink, with MeetingDictation's own indigo.
-   Channels ("r g b"), so Tailwind's opacity modifiers like bg-brand/40 work. */
-:root {
-  --bg: 247 241 229;
-  --bg2: 239 231 213;
-  --paper: 255 252 245;
-  --line: 230 220 200;
-  --ink: 20 24 31;
-  --ink-2: 61 67 79;
-  --ink-3: 107 114 128;
-  --brand: 79 70 229;
-  --brand-deep: 55 48 163;
-  --brand-soft: 224 231 255;
-  --gold: 242 199 68;
-  --gold-soft: 253 241 199;
-  --good: 21 128 61;
-  --good-soft: 220 252 231;
-  --bad: 194 65 12;
-  --bad-soft: 255 237 213;
-}
-
-@media (prefers-color-scheme: dark) {
+/* shadcn/ui tokens (zinc), with MeetingDictation's indigo as the primary. HSL channels. */
+@layer base {
   :root {
-    --bg: 18 20 27;
-    --bg2: 25 28 37;
-    --paper: 28 31 42;
-    --line: 44 48 64;
-    --ink: 238 240 246;
-    --ink-2: 195 199 212;
-    --ink-3: 139 145 165;
-    --brand: 129 140 248;
-    --brand-deep: 165 180 252;
-    --brand-soft: 42 43 90;
-    --gold: 242 199 68;
-    --gold-soft: 59 50 32;
-    --good: 74 222 128;
-    --good-soft: 20 50 31;
-    --bad: 251 146 60;
-    --bad-soft: 58 35 22;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --primary-deep: 244 55% 41%;
+    --primary-soft: 226 100% 97%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --ink-2: 240 5% 26%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --destructive-soft: 0 86% 97%;
+    --success: 142 72% 29%;
+    --success-soft: 138 76% 97%;
+    --warning: 38 92% 50%;
+    --warning-soft: 48 100% 96%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 243 75% 59%;
+    --radius: 0.625rem;
   }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 240 10% 3.9%;
+      --foreground: 0 0% 98%;
+      --card: 240 10% 5.5%;
+      --card-foreground: 0 0% 98%;
+      --popover: 240 10% 5.5%;
+      --popover-foreground: 0 0% 98%;
+      --primary: 239 84% 67%;
+      --primary-foreground: 0 0% 100%;
+      --primary-deep: 234 89% 74%;
+      --primary-soft: 243 40% 16%;
+      --secondary: 240 3.7% 15.9%;
+      --secondary-foreground: 0 0% 98%;
+      --muted: 240 3.7% 15.9%;
+      --muted-foreground: 240 5% 64.9%;
+      --ink-2: 240 5% 80%;
+      --accent: 240 3.7% 15.9%;
+      --accent-foreground: 0 0% 98%;
+      --destructive: 0 72% 60%;
+      --destructive-foreground: 0 0% 98%;
+      --destructive-soft: 0 40% 14%;
+      --success: 142 69% 58%;
+      --success-soft: 145 40% 12%;
+      --warning: 38 92% 55%;
+      --warning-soft: 38 40% 13%;
+      --border: 240 3.7% 15.9%;
+      --input: 240 3.7% 15.9%;
+      --ring: 239 84% 67%;
+    }
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; font-feature-settings: 'cv11', 'ss01'; }
 }
 
-html, body { background: rgb(var(--bg)); color: rgb(var(--ink)); }
-
+/* Older class names, restated on the same tokens (the practice player still uses them). */
 @layer components {
-  .card { @apply rounded-xl2 border border-line bg-paper shadow-card; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-default; }
-  .btn-primary { @apply btn bg-brand text-white hover:bg-brand-deep dark:text-ink; }
-  .btn-ghost { @apply btn border border-line bg-paper text-ink hover:bg-bg2; }
-  .btn-gold { @apply btn bg-gold text-[#14181f] hover:brightness-95; }
-  .input { @apply w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[15px] text-ink outline-none transition placeholder:text-ink-3 focus:border-brand focus:ring-4 focus:ring-brand/15; }
-  .label { @apply mb-1.5 block text-sm font-semibold text-ink-2; }
-  .kbd { @apply rounded-md border border-b-2 border-line bg-bg2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2; }
+  .card { @apply rounded-xl border bg-card text-card-foreground shadow-card; }
+  .btn { @apply inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none disabled:opacity-50; }
+  .btn-primary { @apply btn bg-primary text-primary-foreground shadow-sm hover:bg-primary/90; }
+  .btn-ghost { @apply btn border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground; }
+  .btn-gold { @apply btn bg-warning text-zinc-950 hover:bg-warning/90; }
+  .input { @apply flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50; }
+  .label { @apply mb-1.5 block text-sm font-medium leading-none; }
+  .kbd { @apply pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground; }
 }

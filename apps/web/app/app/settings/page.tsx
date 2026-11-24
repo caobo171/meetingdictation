@@ -6,12 +6,17 @@ import { redirect } from 'next/navigation';
 
 import { signOut } from '@/auth';
 import { ConnectedDevices } from '@/components/ConnectedDevices';
+import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/session';
 
 export const metadata = { title: 'Settings' };
 
-export default async function Settings() {
+export default async function Settings({ searchParams }: { searchParams: { delete?: string } }) {
   const user = await requireUser();
 
   async function saveName(form: FormData) {
@@ -32,50 +37,76 @@ export default async function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-3xl font-extrabold tracking-tight">Settings</h1>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader title="Settings" description="Your profile, connected browsers and account." />
 
-      <form action={saveName} className="card space-y-4 p-6">
-        <h2 className="font-bold">Profile</h2>
-        <div>
-          <label className="label" htmlFor="name">Name</label>
-          <input className="input" id="name" name="name" defaultValue={user.name ?? ''} />
-        </div>
-        <div>
-          <span className="label">Email</span>
-          <p className="text-ink-2">{user.email}</p>
-        </div>
-        <button className="btn-primary">Save</button>
-      </form>
-
-      <div className="card p-6">
-        <h2 className="mb-2 font-bold">Connected browsers</h2>
-        <ConnectedDevices userId={user.id} />
-      </div>
-
-      <div className="card p-6">
-        <h2 className="font-bold">Sign out</h2>
-        <form
-          className="mt-3"
-          action={async () => {
-            'use server';
-            await signOut({ redirectTo: '/' });
-          }}
-        >
-          <button className="btn-ghost">Sign out of this device</button>
+      <Card>
+        <form action={saveName}>
+          <CardHeader>
+            <CardTitle className="text-base">Profile</CardTitle>
+            <CardDescription>How your name appears in MeetingDictation.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" name="name" defaultValue={user.name ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" value={user.email} disabled readOnly />
+            </div>
+          </CardContent>
+          <CardFooter className="border-t px-6 py-4">
+            <Button>Save</Button>
+          </CardFooter>
         </form>
-      </div>
+      </Card>
 
-      <form action={deleteAccount} className="card border-bad/40 p-6">
-        <h2 className="font-bold text-bad">Delete account</h2>
-        <p className="mt-1 text-sm text-ink-2">
-          Removes your account, your uploaded recordings and all progress. This cannot be undone. Type your email to confirm.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input className="input max-w-xs" name="confirm" placeholder={user.email} />
-          <button className="btn bg-bad text-white hover:brightness-95">Delete my account</button>
-        </div>
-      </form>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Connected browsers</CardTitle>
+          <CardDescription>Extensions that sync your practice to this account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ConnectedDevices userId={user.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="text-base">Sign out</CardTitle>
+            <CardDescription>Sign out of MeetingDictation on this device.</CardDescription>
+          </div>
+          <form
+            action={async () => {
+              'use server';
+              await signOut({ redirectTo: '/' });
+            }}
+          >
+            <Button variant="outline">Sign out</Button>
+          </form>
+        </CardHeader>
+      </Card>
+
+      <Card className="border-destructive/40">
+        <form action={deleteAccount}>
+          <CardHeader>
+            <CardTitle className="text-base text-destructive">Delete account</CardTitle>
+            <CardDescription>
+              Removes your account, your uploaded recordings and all progress. This cannot be undone.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="confirm">Type your email to confirm</Label>
+            <Input id="confirm" name="confirm" placeholder={user.email} autoComplete="off" />
+            {searchParams.delete === 'mismatch' && <p className="text-sm text-destructive">That email doesn’t match your account.</p>}
+          </CardContent>
+          <CardFooter className="border-t border-destructive/20 px-6 py-4">
+            <Button variant="destructive">Delete my account</Button>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }

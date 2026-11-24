@@ -1,7 +1,16 @@
 'use client';
 
+import { ArrowPathIcon, ArrowUpTrayIcon, ExclamationTriangleIcon, LinkIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 type Kind = 'upload' | 'youtube';
 
@@ -29,78 +38,79 @@ export function NewRecordingForm() {
     }
   }
 
-  const tab = (k: Kind, label: string) => (
-    <button
-      type="button"
-      onClick={() => setKind(k)}
-      className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${kind === k ? 'bg-paper text-ink shadow-card' : 'text-ink-3 hover:text-ink'}`}
-    >
-      {label}
-    </button>
-  );
-
   return (
-    <form onSubmit={submit} className="card mt-6 space-y-5 p-6">
-      <div className="flex gap-1 rounded-xl bg-bg2 p-1">
-        {tab('upload', '📁 Upload a recording')}
-        {tab('youtube', '▶️ YouTube link')}
-      </div>
+    <Card>
+      <form onSubmit={submit}>
+        <CardContent className="space-y-5 pt-6">
+          <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upload">
+                <ArrowUpTrayIcon />
+                Upload a recording
+              </TabsTrigger>
+              <TabsTrigger value="youtube">
+                <LinkIcon />
+                YouTube link
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-      <div>
-        <label className="label" htmlFor="title">Title</label>
-        <input className="input" id="title" name="title" placeholder="e.g. Weekly sync with the data team" />
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" name="title" placeholder="e.g. Weekly sync with the data team" />
+          </div>
 
-      {kind === 'upload' ? (
-        <div>
-          <label className="label" htmlFor="media">Recording (video or audio)</label>
-          <input
-            id="media"
-            name="media"
-            type="file"
-            accept="video/*,audio/*"
-            required
-            className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:font-semibold file:text-brand"
-          />
-          <p className="mt-1.5 text-xs text-ink-3">MP4, WebM, MOV, MP3, M4A… up to 1 GB. Only you can play it.</p>
-        </div>
-      ) : (
-        <div>
-          <label className="label" htmlFor="youtubeUrl">YouTube link</label>
-          <input className="input" id="youtubeUrl" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=…" required />
-        </div>
-      )}
+          {kind === 'upload' ? (
+            <div className="space-y-2">
+              <Label htmlFor="media">Recording (video or audio)</Label>
+              <Input id="media" name="media" type="file" accept="video/*,audio/*" required className="cursor-pointer" />
+              <p className="text-xs text-muted-foreground">MP4, WebM, MOV, MP3, M4A… up to 1 GB. Only you can play it.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="youtubeUrl">YouTube link</Label>
+              <Input id="youtubeUrl" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=…" required />
+            </div>
+          )}
 
-      <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="label mb-0">Transcript</span>
-          <button type="button" className="text-sm font-semibold text-brand hover:underline" onClick={() => setPaste(!paste)}>
-            {paste ? 'Upload a file instead' : 'Paste text instead'}
-          </button>
-        </div>
-        {paste ? (
-          <textarea
-            name="transcriptText"
-            required
-            rows={7}
-            className="input font-mono text-sm"
-            placeholder={'0:12\nSo in college, I was a government major,\n0:15\nwhich means I had to write a lot of papers.'}
-          />
-        ) : (
-          <input
-            name="transcript"
-            type="file"
-            accept=".vtt,.srt,.txt,text/vtt"
-            required
-            className="block w-full text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-soft file:px-3 file:py-2 file:font-semibold file:text-brand"
-          />
-        )}
-      </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="transcript">Transcript</Label>
+              <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setPaste(!paste)}>
+                {paste ? 'Upload a file instead' : 'Paste text instead'}
+              </Button>
+            </div>
+            {paste ? (
+              <Textarea
+                id="transcript"
+                name="transcriptText"
+                required
+                rows={7}
+                className="font-mono text-xs"
+                placeholder={'0:12\nSo in college, I was a government major,\n0:15\nwhich means I had to write a lot of papers.'}
+              />
+            ) : (
+              <>
+                <Input id="transcript" name="transcript" type="file" accept=".vtt,.srt,.txt,text/vtt" required className="cursor-pointer" />
+                <p className="text-xs text-muted-foreground">.vtt, .srt or a plain-text transcript with timestamps.</p>
+              </>
+            )}
+          </div>
 
-      {error && <p className="rounded-xl bg-bad-soft px-3.5 py-2.5 text-sm font-medium text-bad">{error}</p>}
-      <button className="btn-primary w-full py-3" disabled={busy}>
-        {busy ? 'Preparing your sentences…' : 'Start practising'}
-      </button>
-    </form>
+          {error && (
+            <Alert variant="destructive">
+              <ExclamationTriangleIcon />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button className="w-full" disabled={busy}>
+            {busy && <ArrowPathIcon className="animate-spin" />}
+            {busy ? 'Preparing your sentences…' : 'Start practising'}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
   );
 }

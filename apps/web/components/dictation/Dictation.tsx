@@ -13,8 +13,26 @@ import {
   type Results,
   type Segment,
 } from '@md/core';
+import {
+  ArrowPathRoundedSquareIcon,
+  BackwardIcon,
+  ChevronLeftIcon,
+  CheckCircleIcon,
+  EyeIcon,
+  ExclamationTriangleIcon,
+  ForwardIcon,
+  MusicalNoteIcon,
+  PauseIcon,
+  PlayIcon,
+} from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 import { htmlMediaPort, youTubePort, type MediaPort } from './media';
 
@@ -246,7 +264,7 @@ export function Dictation({ recording, initial }: DictationProps) {
     const prev = results[index];
     if (isDone(prev) && typed === prev.typed) {
       if (index < segments.length - 1) goTo(index + 1, true);
-      else setNote('🎉 You reached the end of the recording!');
+      else setNote('You reached the end of the recording.');
       return;
     }
     if (!typed.trim()) {
@@ -370,41 +388,52 @@ export function Dictation({ recording, initial }: DictationProps) {
     <div className="mx-auto max-w-6xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <Link href="/app/recordings" className="text-sm font-semibold text-ink-3 hover:text-ink">
-            ← Recordings
+          <Link href="/app/recordings" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ChevronLeftIcon className="size-4" />
+            Recordings
           </Link>
-          <h1 className="mt-1 truncate text-2xl font-extrabold tracking-tight">{recording.title}</h1>
+          <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight">{recording.title}</h1>
         </div>
-        <div className="text-right text-sm text-ink-3">
-          <div>
-            <b className="text-ink">{done}</b> of {segments.length} sentences · {pct}%{scored.length ? ` · ~${avg}% right` : ''}
+        <div className="text-right text-sm text-muted-foreground">
+          <div className="tabular-nums">
+            <span className="font-medium text-foreground">{done}</span> of {segments.length} sentences · {pct}%{scored.length ? ` · ~${avg}% right` : ''}
           </div>
-          <div className="text-xs">{saveState === 'saving' ? 'Saving…' : saveState === 'error' ? '⚠️ Not saved, retrying' : '✓ Saved'}</div>
+          <div className="mt-0.5 flex items-center justify-end gap-1 text-xs">
+            {saveState === 'saving' ? (
+              'Saving…'
+            ) : saveState === 'error' ? (
+              <>
+                <ExclamationTriangleIcon className="size-3.5 text-warning" /> Not saved, retrying
+              </>
+            ) : (
+              <>
+                <CheckCircleIcon className="size-3.5 text-success" /> Saved
+              </>
+            )}
+          </div>
         </div>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg2">
-        <div className="h-full rounded-full bg-good transition-all" style={{ width: `${pct}%` }} />
-      </div>
+      <Progress value={pct} className="mt-3 h-1.5" indicatorClassName="bg-success" />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_1fr]">
         <div className="space-y-6">
-          <div className="card overflow-hidden">
+          <Card className="overflow-hidden">
             {recording.sourceType === 'youtube' ? (
               <div ref={ytRef} className="aspect-video w-full bg-black [&>div]:h-full [&>div]:w-full [&_iframe]:h-full [&_iframe]:w-full" />
             ) : recording.mediaType?.startsWith('audio') ? (
-              <div className="flex flex-col items-center gap-3 bg-brand-soft/60 px-6 py-10">
-                <div className={`text-5xl ${playing ? 'animate-pulse' : ''}`}>🎧</div>
+              <div className="flex flex-col items-center gap-4 bg-muted/50 px-6 py-10">
+                <MusicalNoteIcon className={cn('size-12 text-primary', playing && 'animate-pulse')} />
                 <audio ref={videoRef} src={recording.mediaUrl ?? undefined} preload="auto" className="w-full" controls />
               </div>
             ) : (
               <video ref={videoRef} src={recording.mediaUrl ?? undefined} preload="auto" playsInline controls className="aspect-video w-full bg-black" />
             )}
-          </div>
+          </Card>
 
-          <div className="card">
-            <div className="flex items-center justify-between border-b border-line px-5 py-3">
-              <h2 className="font-bold">Sentences</h2>
-              <span className="text-xs text-ink-3">finished ones un-blur</span>
+          <Card>
+            <div className="flex items-center justify-between border-b px-5 py-3">
+              <h2 className="text-sm font-semibold">Sentences</h2>
+              <span className="text-xs text-muted-foreground">Finished ones un-blur</span>
             </div>
             <ol ref={listRef} className="max-h-[420px] overflow-y-auto p-2">
               {segments.map((s, i) => {
@@ -413,50 +442,67 @@ export function Dictation({ recording, initial }: DictationProps) {
                   <li key={i} data-i={i}>
                     <button
                       onClick={() => goTo(i, true)}
-                      className={`flex w-full gap-3 rounded-xl px-3 py-2 text-left text-[14px] transition ${
-                        i === index ? 'bg-brand-soft' : 'hover:bg-bg2/70'
-                      }`}
+                      className={cn(
+                        'flex w-full gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                        i === index ? 'bg-primary/10' : 'hover:bg-muted',
+                      )}
                     >
-                      <span className={`w-12 shrink-0 pt-0.5 font-mono text-xs ${i === index ? 'text-brand' : 'text-ink-3'}`}>{fmt(s.start)}</span>
-                      <span>
-                        {s.speaker && <b className="mr-1 text-ink-2">{s.speaker}:</b>}
-                        <span className={doneRow ? 'text-ink' : 'select-none text-ink-2 blur-[5px]'}>{s.text}</span>
+                      <span className={cn('w-12 shrink-0 pt-0.5 font-mono text-xs tabular-nums', i === index ? 'text-primary' : 'text-muted-foreground')}>
+                        {fmt(s.start)}
                       </span>
-                      {doneRow && <span className="ml-auto shrink-0 text-good">{results[i].passed ? '✓' : '👁'}</span>}
+                      <span>
+                        {s.speaker && <span className="mr-1 font-medium">{s.speaker}:</span>}
+                        <span className={doneRow ? 'text-foreground' : 'select-none text-muted-foreground blur-[5px]'}>{s.text}</span>
+                      </span>
+                      {doneRow &&
+                        (results[i].passed ? (
+                          <CheckCircleIcon className="ml-auto size-4 shrink-0 text-success" />
+                        ) : (
+                          <EyeIcon className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                        ))}
                     </button>
                   </li>
                 );
               })}
             </ol>
-          </div>
+          </Card>
         </div>
 
         <div className="lg:sticky lg:top-8 lg:self-start">
-          <div className="card p-5">
+          <Card className="p-5">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-ink-2">
+              <span className="tabular-nums text-muted-foreground">
                 Sentence {index + 1} / {segments.length} · {fmt(seg.start)}
               </span>
-              {seg.speaker && <span className="truncate font-semibold text-brand">{seg.speaker}</span>}
+              {seg.speaker && <span className="truncate font-medium text-primary">{seg.speaker}</span>}
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button className="btn-ghost px-3" onClick={() => goTo(index - 1, true)} title="Previous (Alt+←)">⏮</button>
-              <button className="btn-primary min-w-[104px]" onClick={togglePlay} title="Play / pause (1)">
-                {playing ? '❚❚ Pause' : '▶ Play'}
-              </button>
-              <button className="btn-ghost px-3" onClick={() => nudge(-NUDGE)} title="Back 2 s (2)">−2s</button>
-              <button className="btn-ghost px-3" onClick={() => nudge(NUDGE)} title="Forward 2 s (3)">+2s</button>
-              <button className="btn-ghost px-3" onClick={() => goTo(index + 1, true)} title="Next (Alt+→)">⏭</button>
-              <button
-                className={`btn-ghost px-3 ${loop ? '!border-brand !bg-brand-soft' : ''}`}
+              <Button variant="outline" size="icon" onClick={() => goTo(index - 1, true)} title="Previous (Alt+←)" aria-label="Previous sentence">
+                <BackwardIcon />
+              </Button>
+              <Button className="min-w-[96px]" onClick={togglePlay} title="Play / pause (1)">
+                {playing ? <PauseIcon /> : <PlayIcon />}
+                {playing ? 'Pause' : 'Play'}
+              </Button>
+              <Button variant="outline" onClick={() => nudge(-NUDGE)} title="Back 2 s (2)" className="px-3 tabular-nums">−2s</Button>
+              <Button variant="outline" onClick={() => nudge(NUDGE)} title="Forward 2 s (3)" className="px-3 tabular-nums">+2s</Button>
+              <Button variant="outline" size="icon" onClick={() => goTo(index + 1, true)} title="Next (Alt+→)" aria-label="Next sentence">
+                <ForwardIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(loop && 'border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary')}
                 onClick={() => setLoop(!loop)}
                 title="Loop (Alt+L)"
+                aria-label="Loop the sentence"
+                aria-pressed={loop}
               >
-                🔁
-              </button>
+                <ArrowPathRoundedSquareIcon />
+              </Button>
               <select
-                className="rounded-xl border border-line bg-paper px-2 py-2 text-sm"
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm"
                 value={rate}
                 onChange={(e) => {
                   const v = Number(e.target.value);
@@ -470,7 +516,7 @@ export function Dictation({ recording, initial }: DictationProps) {
               </select>
             </div>
 
-            <textarea
+            <Textarea
               ref={inputRef}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
@@ -479,15 +525,15 @@ export function Dictation({ recording, initial }: DictationProps) {
               autoComplete="off"
               rows={4}
               placeholder="Type what you hear…  (1 = play, Enter = check)"
-              className={`input mt-4 resize-y text-[16px] ${passed ? '!border-good' : ''}`}
+              className={cn('mt-4 resize-y text-base', passed && 'border-success focus-visible:ring-success')}
             />
 
-            {note && <p className="mt-3 text-sm font-semibold text-bad">{note}</p>}
+            {note && <p className="mt-3 text-sm font-medium text-muted-foreground">{note}</p>}
             {graded && (
               <div className="mt-3">
-                <p className={`text-sm font-semibold ${graded.g.passed ? 'text-good' : 'text-bad'}`}>
+                <p className={cn('text-sm font-medium', graded.g.passed ? 'text-success' : 'text-destructive')}>
                   {graded.g.passed
-                    ? '✓ Perfect! Enter for the next sentence'
+                    ? 'Perfect. Enter for the next sentence'
                     : graded.revealed
                       ? 'Answer shown. Type it out, or Enter to move on'
                       : (() => {
@@ -500,14 +546,15 @@ export function Dictation({ recording, initial }: DictationProps) {
             )}
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button className="btn-primary" onClick={check}>
-                {isDone(r) && typed === r?.typed ? 'Next ⏎' : 'Check ⏎'}
-              </button>
-              <button className="btn-ghost" onClick={giveHint}>Hint</button>
-              <button className="btn-ghost" onClick={showAnswer}>Show answer</button>
+              <Button onClick={check}>
+                {isDone(r) && typed === r?.typed ? 'Next' : 'Check'}
+                <kbd className="ml-1 rounded bg-primary-foreground/20 px-1 font-mono text-[10px]">Enter</kbd>
+              </Button>
+              <Button variant="outline" onClick={giveHint}>Hint</Button>
+              <Button variant="outline" onClick={showAnswer}>Show answer</Button>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-4 text-xs text-ink-3">
+            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-4 text-xs text-muted-foreground">
               <span><span className="kbd">1</span> play</span>
               <span><span className="kbd">2</span>/<span className="kbd">3</span> ±2s</span>
               <span><span className="kbd">Enter</span> check · next</span>
@@ -516,7 +563,7 @@ export function Dictation({ recording, initial }: DictationProps) {
               <span><span className="kbd">Alt ←/→</span> move</span>
               <span><span className="kbd">Ctrl 1</span> types “1”</span>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>

@@ -7,12 +7,15 @@
 
 import { DictationPanel } from './panel';
 import { isStream, isYouTube } from './sources';
+import { isTeams, startTeamsBridge, teamsRecording } from './teams';
 
 declare global {
   interface Window {
     __meetingDictation?: { panel: DictationPanel; injected: boolean };
   }
 }
+
+startTeamsBridge();
 
 const existing = window.__meetingDictation;
 if (existing) {
@@ -22,9 +25,9 @@ if (existing) {
 } else {
   const panel = new DictationPanel();
   // Ran from the manifest (Loom / YouTube) → just the pill; ran from a click → open straight away.
-  const fromClick = !!(document as Document & { __mdClick?: boolean }).__mdClick || !(/loom\.com$|youtube\.com$/.test(location.hostname) || isStream());
+  const fromClick = !!(document as Document & { __mdClick?: boolean }).__mdClick || !(/loom\.com$|youtube\.com$/.test(location.hostname) || isStream() || isTeams());
   window.__meetingDictation = { panel, injected: fromClick };
-  const onVideoPage = () => !isYouTube() || /^\/(watch|shorts|live)/.test(location.pathname);
+  const onVideoPage = () => (isTeams() ? !!teamsRecording() : !isYouTube() || /^\/(watch|shorts|live)/.test(location.pathname));
   if (fromClick) panel.open();
   else if (onVideoPage()) panel.showPill();
   else panel.close();
@@ -44,6 +47,20 @@ if (existing) {
     };
     document.addEventListener('yt-navigate-finish', onNav);
     window.addEventListener('popstate', onNav);
+  }
+
+  if (isTeams()) {
+    // Teams never reloads: show the pill while a recording's Recap is open, start over on another one.
+    let last = teamsRecording()?.uniqueId ?? null;
+    setInterval(() => {
+      const now = teamsRecording()?.uniqueId ?? null;
+      if (now === last) return;
+      last = now;
+      if (!now) {
+        if (!panel.isStarted) panel.close();
+      } else if (panel.isStarted) void panel.restartForNewPage();
+      else panel.showPill();
+    }, 1500);
   }
 }
 

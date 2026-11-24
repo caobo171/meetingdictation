@@ -1,16 +1,23 @@
 'use client';
 
+import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
+
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 import { googleAction, loginAction, signupAction, type FormState } from './actions';
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-primary w-full py-3" disabled={pending}>
+    <Button type="submit" className="w-full" disabled={pending}>
+      {pending && <ArrowPathIcon className="animate-spin" />}
       {pending ? 'One moment…' : label}
-    </button>
+    </Button>
   );
 }
 
@@ -20,15 +27,15 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold tracking-tight">{signup ? 'Create your account' : 'Welcome back'}</h1>
-      <p className="mt-1.5 text-ink-2">
+      <h1 className="text-xl font-semibold tracking-tight">{signup ? 'Create your account' : 'Welcome back'}</h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">
         {signup ? 'Start turning meetings into listening practice.' : 'Sign in to keep practising.'}
       </p>
 
       {google && (
         <form action={googleAction} className="mt-6">
           <input type="hidden" name="next" value={next ?? ''} />
-          <button type="submit" className="btn-ghost w-full py-3">
+          <Button type="submit" variant="outline" className="w-full">
             <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
               <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
               <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
@@ -36,31 +43,30 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
               <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
             </svg>
             Continue with Google
-          </button>
+          </Button>
         </form>
       )}
       {google && (
-        <div className="my-5 flex items-center gap-3 text-xs text-ink-3">
-          <span className="h-px flex-1 bg-line" /> or with email <span className="h-px flex-1 bg-line" />
+        <div className="my-5 flex items-center gap-3 text-xs uppercase text-muted-foreground">
+          <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
         </div>
       )}
 
       <form action={action} className={`space-y-4 ${google ? '' : 'mt-6'}`}>
         <input type="hidden" name="next" value={next ?? ''} />
         {signup && (
-          <div>
-            <label className="label" htmlFor="name">Name</label>
-            <input className="input" id="name" name="name" autoComplete="name" required />
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" name="name" autoComplete="name" required />
           </div>
         )}
-        <div>
-          <label className="label" htmlFor="email">Email</label>
-          <input className="input" id="email" name="email" type="email" autoComplete="email" required />
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required />
         </div>
-        <div>
-          <label className="label" htmlFor="password">Password</label>
-          <input
-            className="input"
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
             id="password"
             name="password"
             type="password"
@@ -69,14 +75,19 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
             required
           />
         </div>
-        {state?.error && <p className="rounded-xl bg-bad-soft px-3.5 py-2.5 text-sm font-medium text-bad">{state.error}</p>}
+        {state?.error && (
+          <Alert variant="destructive">
+            <ExclamationTriangleIcon />
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        )}
         <Submit label={signup ? 'Create account' : 'Sign in'} />
       </form>
 
-      <p className="mt-6 text-center text-sm text-ink-2">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         {signup ? 'Already have an account? ' : 'New here? '}
         <Link
-          className="font-semibold text-brand hover:underline"
+          className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
           href={`${signup ? '/login' : '/signup'}${next ? `?next=${encodeURIComponent(next)}` : ''}`}
         >
           {signup ? 'Sign in' : 'Create an account'}

@@ -8,8 +8,8 @@ export type KeyAction = 'play' | 'back' | 'forward' | 'prev' | 'next' | 'loop' |
 
 export const KEY_ACTIONS: { action: KeyAction; label: string }[] = [
   { action: 'play', label: 'Play / pause' },
-  { action: 'back', label: 'Back 2 s' },
-  { action: 'forward', label: 'Forward 2 s' },
+  { action: 'back', label: 'Skip back' },
+  { action: 'forward', label: 'Skip forward' },
   { action: 'prev', label: 'Previous line' },
   { action: 'next', label: 'Next line' },
   { action: 'loop', label: 'Loop the line' },

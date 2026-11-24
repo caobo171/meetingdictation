@@ -12,6 +12,10 @@
  */
 
 import { type Cue, parseClock, rowsToCues } from '@md/core';
+import { streamTranscript } from './stream';
+import { cuesFromTeams, isTeams, teamsVideo } from './teams';
+
+export { isTeams };
 
 export type SourceKind = 'youtube' | 'captions' | 'loom' | 'stream' | 'file';
 
@@ -35,6 +39,8 @@ async function waitFor<T>(get: () => T | null | undefined, timeoutMs: number, ev
 
 /** The main video: the largest one on screen that is a real recording, not a hover preview. */
 export function findVideo(): HTMLVideoElement | null {
+  // Teams' Recap plays the recording in a SharePoint frame; frame.ts drives it for us.
+  if (isTeams()) return teamsVideo();
   const videos = [...document.querySelectorAll('video')];
   let best: HTMLVideoElement | null = null;
   let bestScore = -1;
@@ -96,18 +102,12 @@ export function youTubeVideoId(): string | null {
 
 // ---------------------------------------------------------------- Microsoft Stream (Teams recordings)
 
-/** "00:01:08.8614762" → 68.86 */
-function offsetSeconds(t: string): number {
-  const m = t.match(/^(\d+):(\d+):(\d+(?:\.\d+)?)$/);
-  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : NaN;
-}
-
 /**
  * Stream lists only the transcript entries in view, so read the whole
  * transcript the way its player does: the item's API URL is in the page's
  * g_fileInfo script, and the request rides on the viewer's own sign-in.
  */
-export async function cuesFromStream(): Promise<{ cues: Cue[]; label: string } | null> {
+export async function cuesFromStream(): Promise<{ cues: Cue[]; ids: string[]; label: string } | null> {
   if (!isStream()) return null;
   const pattern = /"\.spItemUrl"\s*:\s*"((?:[^"\\]|\\.)*)"/;
   let raw: string | undefined;
@@ -117,20 +117,7 @@ export async function cuesFromStream(): Promise<{ cues: Cue[]; label: string } |
   }
   if (!raw) return null;
   const item = (JSON.parse(`"${raw}"`) as string).replace(':443/', '/').replace('/_api/v2.0/', '/_api/v2.1/').replace(/\?.*$/, '');
-  const list = await fetch(`${item}/media/transcripts`, { credentials: 'include' });
-  if (!list.ok) return null;
-  type Meta = { id: string; isDefault?: boolean; languageTag?: string; displayName?: string };
-  const transcripts = ((await list.json()) as { value?: Meta[] }).value ?? [];
-  const pick = transcripts.find((t) => t.languageTag?.startsWith('en') && t.isDefault) ?? transcripts.find((t) => t.languageTag?.startsWith('en')) ?? transcripts.find((t) => t.isDefault) ?? transcripts[0];
-  if (!pick) return null;
-  const content = await fetch(`${item}/media/transcripts/${pick.id}/streamContent?format=json`, { credentials: 'include' });
-  if (!content.ok) return null;
-  type Entry = { startOffset: string; endOffset: string; text: string; speakerDisplayName?: string };
-  const entries = ((await content.json()) as { entries?: Entry[] }).entries ?? [];
-  const cues: Cue[] = entries
-    .map((e) => ({ start: offsetSeconds(e.startOffset), end: offsetSeconds(e.endOffset), text: e.text ?? '', speaker: e.speakerDisplayName || undefined }))
-    .filter((c) => Number.isFinite(c.start) && Number.isFinite(c.end) && c.text.trim());
-  return cues.length ? { cues, label: `Stream transcript${pick.languageTag ? ` (${pick.languageTag})` : ''}` } : null;
+  return streamTranscript(item);
 }
 
 // ---------------------------------------------------------------- captions track
@@ -319,7 +306,11 @@ export async function detectSource(video: HTMLVideoElement | null): Promise<Sour
   }
   if (isStream()) {
     const stream = await cuesFromStream().catch(() => null);
-    if (stream) return { kind: 'stream', ...stream };
+    if (stream) return { kind: 'stream', cues: stream.cues, label: stream.label };
+  }
+  if (isTeams()) {
+    const teams = await cuesFromTeams().catch(() => null);
+    if (teams) return { kind: 'stream', cues: teams.cues, label: teams.label };
   }
   if (video) {
     const tracks = await cuesFromTracks(video).catch(() => null);
@@ -337,6 +328,10 @@ export interface TranscriptLine {
   /** The element holding the words (blurred, or swapped for blanks). */
   el: HTMLElement;
   start: number;
+  /** When it is known (Teams); otherwise a line runs until the next one starts. */
+  end?: number;
+  /** The site's own id for the line, when it has one (Teams). */
+  id?: string;
   text: string;
   speaker?: string;
   /** The speaker's name is printed on this line (a new speaker starts here). */

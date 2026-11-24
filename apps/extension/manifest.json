@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MeetingDictation",
   "version": "0.2.0",
-  "description": "Blur the transcript of a recorded meeting and practise dictation on it, sentence by sentence. Works on Loom, YouTube, Teams recordings in Microsoft Stream, and any captioned video.",
+  "description": "Blur the transcript of a recorded meeting and practise dictation on it, sentence by sentence. Works on Loom, YouTube, Teams meeting recordings (Recap and Stream), and any captioned video.",
   "permissions": [
     "storage",
     "activeTab",
@@ -33,11 +33,23 @@
         "https://www.loom.com/embed/*",
         "https://www.youtube.com/*",
         "https://m.youtube.com/*",
-        "https://*.sharepoint.com/*/_layouts/15/stream.aspx*"
+        "https://*.sharepoint.com/*/_layouts/15/stream.aspx*",
+        "https://teams.cloud.microsoft/*",
+        "https://teams.microsoft.com/*"
       ],
       "js": [
         "dist/content.js"
       ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.sharepoint.com/*"
+      ],
+      "js": [
+        "dist/frame.js"
+      ],
+      "all_frames": true,
       "run_at": "document_idle"
     },
     {

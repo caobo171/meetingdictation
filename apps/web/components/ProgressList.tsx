@@ -1,6 +1,10 @@
+import { ChevronRightIcon, ComputerDesktopIcon, PlayCircleIcon, UserGroupIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 import type { Progress } from '@prisma/client';
+
+import { Badge } from '@/components/ui/badge';
+import { Progress as Bar } from '@/components/ui/progress';
 
 function href(p: Progress): { url: string; external: boolean } {
   if (p.key.startsWith('web:')) return { url: `/app/r/${p.key.slice(4)}`, external: false };
@@ -15,37 +19,55 @@ function ago(d: Date): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+const SITES: Record<string, { label: string; icon: typeof PlayCircleIcon }> = {
+  youtube: { label: 'YouTube', icon: PlayCircleIcon },
+  loom: { label: 'Loom', icon: VideoCameraIcon },
+  teams: { label: 'Teams', icon: UserGroupIcon },
+};
+
+function where(p: Progress) {
+  if (p.source === 'web') return { label: 'Website', icon: ComputerDesktopIcon };
+  return SITES[p.site ?? ''] ?? { label: p.site ? p.site[0].toUpperCase() + p.site.slice(1) : 'Extension', icon: VideoCameraIcon };
+}
+
+/** Strip the browser-tab noise sites add to titles: "(3) Chat | … | Microsoft Teams". */
+function cleanTitle(t: string): string {
+  return t.replace(/^\(\d+\)\s*/, '').replace(/^Chat \| /, '').replace(/\s*[|–-]\s*(Microsoft Teams|YouTube|Loom)$/, '').trim() || t;
+}
+
 export function ProgressList({ items }: { items: Progress[] }) {
   return (
-    <ul className="divide-y divide-line">
+    <ul className="divide-y">
       {items.map((p) => {
         const pct = Math.round((p.done / Math.max(1, p.total)) * 100);
         const link = href(p);
+        const site = where(p);
         return (
           <li key={p.id}>
             <Link
               href={link.url}
               target={link.external ? '_blank' : undefined}
-              className="flex items-center gap-4 px-5 py-4 transition hover:bg-bg2/60"
+              className="group flex items-center gap-4 px-6 py-4 transition-colors hover:bg-muted/50"
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-lg">
-                {p.source === 'web' ? '🎧' : p.site === 'youtube' ? '▶️' : p.site === 'loom' ? '🎥' : '🧩'}
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground">
+                <site.icon className="size-5" />
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{p.title}</div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-ink-3">
-                  <span className="rounded-md bg-bg2 px-1.5 py-0.5 font-semibold text-ink-2">
-                    {p.source === 'web' ? 'Website' : `Extension${p.site ? ` · ${p.site}` : ''}`}
-                  </span>
-                  <span>{p.done} of {p.total} sentences</span>
-                  <span>·</span>
-                  <span>{ago(p.updatedAt)}</span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{cleanTitle(p.title)}</span>
+                  <Badge variant="secondary" className="shrink-0 font-normal">
+                    {site.label}
+                  </Badge>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg2">
-                  <div className="h-full rounded-full bg-good" style={{ width: `${pct}%` }} />
+                <div className="flex items-center gap-3">
+                  <Bar value={pct} className="h-1.5 max-w-xs" />
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {p.done}/{p.total} · {ago(p.updatedAt)}
+                  </span>
                 </div>
               </div>
-              <span className="hidden text-sm font-bold text-ink-2 sm:block">{pct}%</span>
+              <span className="hidden w-10 text-right text-sm font-medium tabular-nums sm:block">{pct}%</span>
+              <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </Link>
           </li>
         );

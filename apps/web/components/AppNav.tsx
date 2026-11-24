@@ -1,49 +1,76 @@
 'use client';
 
+import {
+  Cog6ToothIcon,
+  HomeIcon,
+  PlusCircleIcon,
+  PuzzlePieceIcon,
+  RectangleStackIcon,
+} from '@heroicons/react/24/outline';
+import {
+  Cog6ToothIcon as Cog6ToothSolid,
+  HomeIcon as HomeSolid,
+  PlusCircleIcon as PlusCircleSolid,
+  PuzzlePieceIcon as PuzzlePieceSolid,
+  RectangleStackIcon as RectangleStackSolid,
+} from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { cn } from '@/lib/utils';
+
 const ITEMS = [
-  { href: '/app', label: 'Home', icon: '🏠' },
-  { href: '/app/new', label: 'New recording', icon: '➕' },
-  { href: '/app/recordings', label: 'Recordings', icon: '🎧' },
-  { href: '/app/extension', label: 'Extension', icon: '🧩' },
-  { href: '/app/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/app', label: 'Home', icon: HomeIcon, active: HomeSolid },
+  { href: '/app/new', label: 'New recording', short: 'New', icon: PlusCircleIcon, active: PlusCircleSolid },
+  { href: '/app/recordings', label: 'Recordings', short: 'Library', icon: RectangleStackIcon, active: RectangleStackSolid },
+  { href: '/app/extension', label: 'Extension', icon: PuzzlePieceIcon, active: PuzzlePieceSolid },
+  { href: '/app/settings', label: 'Settings', icon: Cog6ToothIcon, active: Cog6ToothSolid },
 ];
 
 export function AppNav({ variant }: { variant: 'side' | 'bottom' }) {
   const path = usePathname();
-  const active = (href: string) => (href === '/app' ? path === '/app' : path.startsWith(href));
+  const isActive = (href: string) => (href === '/app' ? path === '/app' : path.startsWith(href));
+
   if (variant === 'bottom') {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-paper lg:hidden">
-        {ITEMS.slice(0, 4).map((i) => (
-          <Link
-            key={i.href}
-            href={i.href}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${active(i.href) ? 'text-brand' : 'text-ink-3'}`}
-          >
-            <span className="text-lg">{i.icon}</span>
-            {i.label.split(' ')[0]}
-          </Link>
-        ))}
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background/95 backdrop-blur lg:hidden">
+        {ITEMS.map((i) => {
+          const on = isActive(i.href);
+          const Icon = on ? i.active : i.icon;
+          return (
+            <Link
+              key={i.href}
+              href={i.href}
+              className={cn('flex flex-col items-center gap-1 py-2 text-[11px] font-medium', on ? 'text-primary' : 'text-muted-foreground')}
+            >
+              <Icon className="size-5" />
+              {i.short ?? i.label}
+            </Link>
+          );
+        })}
       </nav>
     );
   }
+
   return (
-    <nav className="space-y-1">
-      {ITEMS.map((i) => (
-        <Link
-          key={i.href}
-          href={i.href}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-semibold transition ${
-            active(i.href) ? 'bg-brand-soft text-brand' : 'text-ink-2 hover:bg-bg2'
-          }`}
-        >
-          <span className="w-5 text-center">{i.icon}</span>
-          {i.label}
-        </Link>
-      ))}
+    <nav className="grid gap-0.5">
+      {ITEMS.map((i) => {
+        const on = isActive(i.href);
+        const Icon = on ? i.active : i.icon;
+        return (
+          <Link
+            key={i.href}
+            href={i.href}
+            className={cn(
+              'flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
+              on ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+            )}
+          >
+            <Icon className={cn('size-[18px]', on && 'text-primary')} />
+            {i.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

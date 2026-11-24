@@ -136,7 +136,7 @@ describe('mergeResults', () => {
   });
 });
 
-import { blankParts, wordMatches } from './src/compare';
+import { blankParts, isSmallTalk, wordMatches } from './src/compare';
 
 describe('blanks', () => {
   it('splits a line into words with visible punctuation', () => {
@@ -154,5 +154,21 @@ describe('blanks', () => {
     expect(wordMatches('see', 'sea')).toBe(false);
     expect(wordMatches("Let's", "let's")).toBe(true);
     expect(wordMatches('the', '')).toBe(false);
+  });
+});
+
+describe('isSmallTalk', () => {
+  it('spots greetings and meeting small talk, names included', () => {
+    for (const t of ['Hi, Mark. Hi, Joe.', 'Hello!', 'Mm.', 'How are you?', 'Good morning everyone.', 'Thanks, Tess.', 'Yeah.', 'Can you see my screen?', "I'm good, thanks."]) {
+      expect(isSmallTalk(t), t).toBe(true);
+    }
+  });
+  it('leaves real sentences to practise', () => {
+    for (const t of ['Then we deploy it.', "Hi team, today I'll show the rollback flow.", 'Keep the current version.', 'Is it going to break?']) {
+      expect(isSmallTalk(t), t).toBe(false);
+    }
+  });
+  it('shows hi and then inside a line instead of blanking them', () => {
+    expect(blankParts('Then we hi go').map((p) => p.filler)).toEqual([true, false, true, false]);
   });
 });
