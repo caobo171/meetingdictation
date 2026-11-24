@@ -1,4 +1,4 @@
-import { CommandLineIcon, InformationCircleIcon, LinkIcon, PlayCircleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CommandLineIcon, InformationCircleIcon, LinkIcon, PlayCircleIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 import { ConnectedDevices } from '@/components/ConnectedDevices';
@@ -8,12 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireUser } from '@/lib/session';
 
+import manifest from '../../../../extension/manifest.json';
+
 export const metadata = { title: 'Browser extension' };
 
+// Built and zipped on every deploy by `npm run ext:pack` (apps/extension/pack.mjs).
+const DOWNLOAD = '/downloads/meetingdictation-extension.zip';
+const code = 'rounded bg-muted px-1.5 py-0.5 font-mono text-xs';
+
 const STEPS = [
-  <>Build it: <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">npm run ext</code> in the repo (folder <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">apps/extension</code>).</>,
-  <>Open <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">chrome://extensions</code> and switch on <b className="font-medium text-foreground">Developer mode</b>.</>,
-  <>Click <b className="font-medium text-foreground">Load unpacked</b> and choose the <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">apps/extension</code> folder.</>,
+  <>Download the zip above and unzip it. You get a <code className={code}>meetingdictation-extension</code> folder; keep it somewhere it will stay.</>,
+  <>Open <code className={code}>chrome://extensions</code> and switch on <b className="font-medium text-foreground">Developer mode</b>.</>,
+  <>Click <b className="font-medium text-foreground">Load unpacked</b> and choose the <code className={code}>meetingdictation-extension</code> folder.</>,
   <>Pin MeetingDictation from the puzzle-piece menu, then connect it below.</>,
 ];
 
@@ -33,9 +39,17 @@ export default async function ExtensionPage() {
       />
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Install</CardTitle>
-          <CardDescription>Four steps, about a minute.</CardDescription>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="text-base">Install</CardTitle>
+            <CardDescription>Four steps, about a minute. Chrome, Edge, Brave and Arc.</CardDescription>
+          </div>
+          <Button asChild>
+            <a href={DOWNLOAD} download>
+              <ArrowDownTrayIcon />
+              Download v{manifest.version}
+            </a>
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <ol className="space-y-3">
@@ -48,7 +62,7 @@ export default async function ExtensionPage() {
           </ol>
           <Alert>
             <InformationCircleIcon />
-            <AlertDescription>The Chrome Web Store listing is coming soon. Until then, load it unpacked as above.</AlertDescription>
+            <AlertDescription>The Chrome Web Store listing is coming soon. Until then, load it unpacked as above. To update, download the new zip, replace the folder, and press reload on the extension’s card.</AlertDescription>
           </Alert>
         </CardContent>
       </Card>

@@ -7,7 +7,7 @@
 declare const __MD_APP_URL__: string;
 
 export const DEFAULT_APP = __MD_APP_URL__;
-export const APP_ORIGINS = ['http://localhost:4100', 'https://meetingdictation.app'];
+export const APP_ORIGINS = ['http://localhost:4100', 'https://meetingdictation.com'];
 
 export interface Auth {
   token: string;

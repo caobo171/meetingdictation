@@ -55,7 +55,7 @@
     {
       "matches": [
         "http://localhost:4100/extension/connect*",
-        "https://meetingdictation.app/extension/connect*"
+        "https://meetingdictation.com/extension/connect*"
       ],
       "js": [
         "dist/connect.js"
@@ -73,6 +73,6 @@
   },
   "host_permissions": [
     "http://localhost:4100/*",
-    "https://meetingdictation.app/*"
+    "https://meetingdictation.com/*"
   ]
 }

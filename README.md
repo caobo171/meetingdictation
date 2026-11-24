@@ -20,6 +20,7 @@ cp apps/web/.env.example apps/web/.env    # then set AUTH_SECRET (openssl rand -
 npm run db:push -w @md/web                # creates the tables
 npm run dev                               # http://localhost:4100
 npm run ext                               # builds apps/extension/dist
+npm run ext:pack                          # the zip behind the site's Download button
 npm test                                  # core tests
 ```
 
@@ -73,10 +74,14 @@ which drives the streak and chart.
   domain (DKIM, MAIL FROM `plunk.wele-learn.com`).
 - **Uploads** go to `UPLOAD_DIR` on local disk. Use a persistent volume, or
   move them to S3 before running more than one instance.
+- **Extension download**: `script.sh` runs `npm run ext:pack` on every deploy.
+  It builds the extension for `https://meetingdictation.com` and zips it to
+  `apps/web/public/downloads/meetingdictation-extension.zip` (gitignored), which
+  the **Download** button on `/app/extension` serves. Bump `version` in
+  `apps/extension/manifest.json` when the extension changes.
 - **Domain**: the extension trusts `http://localhost:4100` and
-  `https://meetingdictation.app`, set in `apps/extension/src/config.ts` and
+  `https://meetingdictation.com`, set in `apps/extension/src/config.ts` and
   `apps/extension/manifest.json` (host permissions and the connect script).
-  Change both to the real domain and build with `MD_APP_URL=https://… npm run ext`.
 
 ## Brand
 

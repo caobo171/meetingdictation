@@ -6,7 +6,11 @@ at a time, and grades what you type word by word.
 
 ## Install (unpacked)
 
-From the repo root: `npm install`, then `npm run ext`. Open `chrome://extensions`,
+Learners: download the zip from the website's **Extension** page
+(`/app/extension`), unzip it, then **Load unpacked** the
+`meetingdictation-extension` folder in `chrome://extensions` (Developer mode on).
+
+Developers: from the repo root: `npm install`, then `npm run ext`. Open `chrome://extensions`,
 turn on **Developer mode**, **Load unpacked**, and pick `apps/extension`. After a
 code change, `npm run ext` and press reload on the extension card.
 

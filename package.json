@@ -1,11 +1,15 @@
 {
   "name": "meetingdictation",
   "private": true,
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "npm run dev -w @md/web",
     "build": "npm run build -w @md/extension && npm run build -w @md/web",
     "test": "npm test -w @md/core",
-    "ext": "npm run build -w @md/extension"
+    "ext": "npm run build -w @md/extension",
+    "ext:pack": "npm run pack -w @md/extension"
   }
 }

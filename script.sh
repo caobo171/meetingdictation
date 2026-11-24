@@ -13,7 +13,7 @@
 #   TLS         Let's Encrypt cert `meetingdictation.com` (apex + www), webroot renewal
 #
 # Usage:
-#   ./script.sh              # npm ci, prisma db push, build, pm2 restart
+#   ./script.sh              # npm ci, prisma db push, pack the extension zip, build, pm2 restart
 #   ./script.sh --restart    # skip install and build, just restart pm2
 #   ./script.sh --no-install # skip npm ci
 #   ./script.sh --nginx      # also install nginx/meetingdictation.com.conf and reload nginx
@@ -73,6 +73,8 @@ fi
 if [ "$BUILD" = true ]; then
   echo "===== Database schema ====="
   (cd "$WEB_DIR" && npx prisma db push --skip-generate)
+  echo "===== Extension zip ====="
+  (cd "$ROOT_DIR" && npm run ext:pack)
   echo "===== Build ====="
   (cd "$WEB_DIR" && nice -n 10 env NODE_OPTIONS="--max-old-space-size=2048" npm run build)
 fi

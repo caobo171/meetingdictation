@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc --noEmit && node build.mjs",
     "watch": "node build.mjs --watch",
-    "test": "echo \"core tests live in @md/core\""
+    "test": "echo \"core tests live in @md/core\"",
+    "pack": "tsc --noEmit && node pack.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
