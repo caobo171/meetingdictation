@@ -1,11 +1,11 @@
-// SQLite for local development. For production switch the provider to
-// "mysql" or "postgresql" and point DATABASE_URL at it; the schema is portable.
+// PostgreSQL everywhere: production uses the shared Postgres on wele_eu,
+// local development a local Postgres (see .env.example).
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
