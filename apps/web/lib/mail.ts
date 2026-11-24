@@ -3,14 +3,15 @@ import 'server-only';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 /**
- * Mail goes out through Amazon SES (v2), like WELE: from no-reply@ on a domain verified in SES, with Easy DKIM and a
- * custom MAIL FROM (mail.meetingdictation.com) so SPF and DKIM both align. Every message carries a text/plain part next
- * to the HTML, since HTML-only mail scores as spam.
+ * Mail goes out through Amazon SES (v2) with WELE's account and keys, from meetingdictation@wele-learn.com. That address
+ * has no SES identity of its own, so SES signs it as the verified wele-learn.com domain, whose DKIM and custom MAIL FROM
+ * (plunk.wele-learn.com) both align. Every message carries a text/plain part next to the HTML, since HTML-only mail
+ * scores as spam.
  *
  * Without SES keys (local development) nothing is sent: the message is printed to the server console instead.
  */
 
-const FROM = process.env.MAIL_FROM || 'MeetingDictation <no-reply@meetingdictation.com>';
+const FROM = process.env.MAIL_FROM || 'MeetingDictation <meetingdictation@wele-learn.com>';
 const REPLY_TO = process.env.MAIL_REPLY_TO;
 
 let client: SESv2Client | null | undefined;
