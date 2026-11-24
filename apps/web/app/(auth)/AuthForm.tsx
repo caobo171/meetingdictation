@@ -2,7 +2,7 @@
 
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useFormState, useFormStatus } from 'react-dom';
+import { startTransition, useActionState, type FormEvent } from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,7 @@ import { Label } from '@/components/ui/label';
 
 import { googleAction, loginAction, signupAction, type FormState } from './actions';
 
-function Submit({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function Submit({ label, pending }: { label: string; pending: boolean }) {
   return (
     <Button type="submit" className="w-full" disabled={pending}>
       {pending && <ArrowPathIcon className="animate-spin" />}
@@ -22,7 +21,14 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; google: boolean; next?: string }) {
-  const [state, action] = useFormState<FormState, FormData>(mode === 'login' ? loginAction : signupAction, undefined);
+  const [state, action, pending] = useActionState<FormState, FormData>(mode === 'login' ? loginAction : signupAction, undefined);
+  // React 19 clears a form after its `action` runs, which would make a learner retype their email after a
+  // wrong password. Submitting from onSubmit keeps what they typed; `action` stays for no-JS submits.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    startTransition(() => action(data));
+  };
   const signup = mode === 'signup';
 
   return (
@@ -52,7 +58,7 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
         </div>
       )}
 
-      <form action={action} className={`space-y-4 ${google ? '' : 'mt-6'}`}>
+      <form action={action} onSubmit={submit} className={`space-y-4 ${google ? '' : 'mt-6'}`}>
         <input type="hidden" name="next" value={next ?? ''} />
         {signup && (
           <div className="space-y-2">
@@ -81,7 +87,7 @@ export function AuthForm({ mode, google, next }: { mode: 'login' | 'signup'; goo
             <AlertDescription>{state.error}</AlertDescription>
           </Alert>
         )}
-        <Submit label={signup ? 'Create account' : 'Sign in'} />
+        <Submit label={signup ? 'Create account' : 'Sign in'} pending={pending} />
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">

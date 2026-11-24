@@ -37,7 +37,7 @@ function Stat({ label, value, hint, icon: Icon }: { label: string; value: string
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const s = await dashboardStats(user.id, learnerToday());
+  const s = await dashboardStats(user.id, await learnerToday());
   const first = (user.name ?? '').split(' ')[0];
   const practisedToday = s.last14[13].segments > 0;
   const week = s.last14.slice(7).reduce((a, d) => a + d.segments, 0);

@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     if (media.size > MAX_MEDIA) return bad('Recordings up to 1 GB are supported.');
     if (!/^(audio|video)\//.test(media.type)) return bad('That file is not audio or video.');
     const ext = (path.extname(media.name) || (media.type.startsWith('audio') ? '.mp3' : '.mp4')).toLowerCase().replace(/[^.a-z0-9]/g, '');
-    const dir = path.resolve(process.env.UPLOAD_DIR ?? './uploads', userId);
+    const dir = path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_DIR ?? './uploads', userId);
     await mkdir(dir, { recursive: true });
     const file = `${randomUUID()}${ext}`;
     await writeFile(path.join(dir, file), Buffer.from(await media.arrayBuffer()));

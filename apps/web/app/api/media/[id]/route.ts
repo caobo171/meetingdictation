@@ -9,13 +9,14 @@ import { currentUserId } from '@/lib/session';
 export const runtime = 'nodejs';
 
 /** The owner's uploaded recording, with Range support so the player can seek. */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const userId = await currentUserId();
   if (!userId) return new Response('Unauthorized', { status: 401 });
-  const rec = await db.recording.findFirst({ where: { id: params.id, userId } });
+  const rec = await db.recording.findFirst({ where: { id, userId } });
   if (!rec?.mediaPath) return new Response('Not found', { status: 404 });
 
-  const root = path.resolve(process.env.UPLOAD_DIR ?? './uploads');
+  const root = path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_DIR ?? './uploads');
   const file = path.resolve(root, rec.mediaPath);
   if (!file.startsWith(root + path.sep)) return new Response('Not found', { status: 404 });
   const { size } = await stat(file);

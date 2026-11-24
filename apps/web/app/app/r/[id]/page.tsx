@@ -7,14 +7,16 @@ import { loadProgress } from '@/lib/progress';
 import { requireUser } from '@/lib/session';
 import { youTubeId } from '@/lib/youtube';
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
-  const rec = await db.recording.findUnique({ where: { id: params.id }, select: { title: true } });
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const rec = await db.recording.findUnique({ where: { id }, select: { title: true } });
   return { title: rec?.title ?? 'Practice' };
 }
 
-export default async function PracticePage({ params }: { params: { id: string } }) {
+export default async function PracticePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  const rec = await db.recording.findFirst({ where: { id: params.id, userId: user.id } });
+  const rec = await db.recording.findFirst({ where: { id, userId: user.id } });
   if (!rec) notFound();
   const progress = await loadProgress(user.id, `web:${rec.id}`);
 

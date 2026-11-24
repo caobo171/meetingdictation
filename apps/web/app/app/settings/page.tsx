@@ -16,7 +16,8 @@ import { requireUser } from '@/lib/session';
 
 export const metadata = { title: 'Settings' };
 
-export default async function Settings({ searchParams }: { searchParams: { delete?: string } }) {
+export default async function Settings(props: { searchParams: Promise<{ delete?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   async function saveName(form: FormData) {
@@ -32,7 +33,7 @@ export default async function Settings({ searchParams }: { searchParams: { delet
     const u = await requireUser();
     if (String(form.get('confirm') ?? '').trim().toLowerCase() !== u.email.toLowerCase()) redirect('/app/settings?delete=mismatch');
     await db.user.delete({ where: { id: u.id } });
-    await rm(path.resolve(process.env.UPLOAD_DIR ?? './uploads', u.id), { recursive: true, force: true });
+    await rm(path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_DIR ?? './uploads', u.id), { recursive: true, force: true });
     await signOut({ redirectTo: '/' });
   }
 
