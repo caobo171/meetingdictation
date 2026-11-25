@@ -6,6 +6,7 @@ import {
   PlusCircleIcon,
   PuzzlePieceIcon,
   RectangleStackIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import {
   Cog6ToothIcon as Cog6ToothSolid,
@@ -13,6 +14,7 @@ import {
   PlusCircleIcon as PlusCircleSolid,
   PuzzlePieceIcon as PuzzlePieceSolid,
   RectangleStackIcon as RectangleStackSolid,
+  SparklesIcon as SparklesSolid,
 } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -24,6 +26,7 @@ const ITEMS = [
   { href: '/app/new', label: 'New recording', short: 'New', icon: PlusCircleIcon, active: PlusCircleSolid },
   { href: '/app/recordings', label: 'Recordings', short: 'Library', icon: RectangleStackIcon, active: RectangleStackSolid },
   { href: '/app/extension', label: 'Extension', icon: PuzzlePieceIcon, active: PuzzlePieceSolid },
+  { href: '/app/billing', label: 'Plan', icon: SparklesIcon, active: SparklesSolid },
   { href: '/app/settings', label: 'Settings', icon: Cog6ToothIcon, active: Cog6ToothSolid },
 ];
 
@@ -33,7 +36,7 @@ export function AppNav({ variant }: { variant: 'side' | 'bottom' }) {
 
   if (variant === 'bottom') {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background/95 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t bg-background/95 backdrop-blur lg:hidden">
         {ITEMS.map((i) => {
           const on = isActive(i.href);
           const Icon = on ? i.active : i.icon;

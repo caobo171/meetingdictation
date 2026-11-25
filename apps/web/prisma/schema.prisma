@@ -20,6 +20,21 @@ model User {
   progress     Progress[]
   days         ActivityDay[]
   tokens       ExtToken[]
+
+  // Billing (Polar). Pro while `lifetime` is set or `proUntil` is in the future.
+  polarCustomerId String?
+  lifetime        Boolean   @default(false)
+  subId           String?
+  subStatus       String? // Polar's subscription status: trialing, active, past_due, canceled, …
+  subCancelAtEnd  Boolean   @default(false)
+  proUntil        DateTime?
+}
+
+/// Polar webhook deliveries already applied, by their `webhook-id`, so a redelivery is a no-op.
+model PolarEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
 }
 
 /// A recording practised on the website: an uploaded file or a YouTube video, plus its transcript.

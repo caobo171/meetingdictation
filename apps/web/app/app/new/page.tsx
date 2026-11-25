@@ -1,5 +1,11 @@
+import Link from 'next/link';
+
 import { PageHeader } from '@/components/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { db } from '@/lib/db';
+import { FREE_RECORDINGS, isPro } from '@/lib/polar';
+import { requireUser } from '@/lib/session';
 
 import { NewRecordingForm } from './NewRecordingForm';
 
@@ -12,11 +18,27 @@ const SOURCES = [
   { name: 'YouTube', how: 'Under the video, …more → Show transcript, select it all, copy, and paste it here.' },
 ];
 
-export default function NewRecording() {
+export default async function NewRecording() {
+  const user = await requireUser();
+  const atLimit = !isPro(user) && (await db.recording.count({ where: { userId: user.id } })) >= FREE_RECORDINGS;
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="New recording" description="Bring a recording and its transcript. We split it into sentences for you to dictate." />
-      <NewRecordingForm />
+      {atLimit ? (
+        <Card className="border-primary/40">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle className="text-base">You’ve used your {FREE_RECORDINGS} free recordings</CardTitle>
+              <CardDescription>Go Pro for unlimited recordings ($2 a month, 7 days free), or delete one from your library.</CardDescription>
+            </div>
+            <Button asChild>
+              <Link href="/app/billing">See plans</Link>
+            </Button>
+          </CardHeader>
+        </Card>
+      ) : (
+        <NewRecordingForm />
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Where to get the transcript</CardTitle>

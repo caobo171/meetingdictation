@@ -6,6 +6,7 @@ import { buildSegments, hasWords, parseSubtitleFile } from '@md/core';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
+import { FREE_RECORDINGS, isPro } from '@/lib/polar';
 import { currentUserId } from '@/lib/session';
 import { youTubeId } from '@/lib/youtube';
 
@@ -19,6 +20,14 @@ const bad = (message: string, status = 400) => NextResponse.json({ message }, { 
 export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return bad('Sign in first.', 401);
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) return bad('Sign in first.', 401);
+  if (!isPro(user) && (await db.recording.count({ where: { userId } })) >= FREE_RECORDINGS) {
+    return NextResponse.json(
+      { message: `Free accounts keep ${FREE_RECORDINGS} recordings. Upgrade to Pro for unlimited recordings, or delete one first.`, upgrade: true },
+      { status: 402 },
+    );
+  }
 
   const form = await req.formData();
   const kind = String(form.get('kind') ?? '');

@@ -14,6 +14,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        {/* Ship or Die hackathon site verification. */}
+        <script defer src="https://www.ship-or-die.com/hackathon/verify.js" data-site="0fa79dc4ee3a5766f1e26c743718d75a606c931c" />
+      </head>
       <body className="min-h-screen font-sans antialiased">{children}</body>
     </html>
   );
