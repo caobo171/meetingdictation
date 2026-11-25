@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MeetingDictation",
   "version": "0.2.0",
-  "description": "Blur the transcript of a recorded meeting and practise dictation on it, sentence by sentence. Works on Loom, YouTube, Teams meeting recordings (Recap and Stream), and any captioned video.",
+  "description": "Practise listening on recorded meetings: type what you hear, line by line, on Loom, YouTube and Teams recordings.",
   "permissions": [
     "storage",
     "activeTab",

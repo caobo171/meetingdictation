@@ -179,7 +179,12 @@ export default async function Landing() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground sm:px-6">
           <Logo size={20} />
-          <span>© {new Date().getFullYear()} MeetingDictation</span>
+          <span className="flex items-center gap-4">
+            <Link className="hover:text-foreground" href="/privacy">
+              Privacy
+            </Link>
+            <span>© {new Date().getFullYear()} MeetingDictation</span>
+          </span>
         </div>
       </footer>
     </div>
