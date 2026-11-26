@@ -7,17 +7,20 @@
  *  2. Any <video> with a captions/subtitles <track> (Loom, most LMS and
  *     self-hosted players, many meeting-recording pages).
  *  3. Loom's transcript list, when the track is missing.
- *  4. A .vtt / .srt / timestamped .txt the learner picks (Zoom, Teams, Meet,
+ *  4. TED talks: the whole transcript from the talk page's own data (its
+ *     subtitle track only holds what the player has buffered).
+ *  5. A .vtt / .srt / timestamped .txt the learner picks (Zoom, Teams, Meet,
  *     Drive all let you download one) - handled by the panel.
  */
 
 import { type Cue, parseClock, rowsToCues } from '@md/core';
 import { streamTranscript } from './stream';
 import { cuesFromTeams, isTeams, teamsVideo } from './teams';
+import { isTed, loadTedTalk, markTedSoundTags, openTedTranscriptButton, tedAdShowing, tedCueEls, tedTalk } from './ted';
 
-export { isTeams };
+export { isTeams, isTed };
 
-export type SourceKind = 'youtube' | 'captions' | 'loom' | 'stream' | 'file';
+export type SourceKind = 'youtube' | 'captions' | 'loom' | 'stream' | 'ted' | 'file';
 
 export interface Source {
   kind: SourceKind;
@@ -224,6 +227,13 @@ export function youTubeAdShowing(): boolean {
   return !!document.querySelector('#movie_player.ad-showing, .html5-video-player.ad-showing');
 }
 
+/** An ad is playing instead of the recording (YouTube, TED): leave the player alone until it ends. */
+export function adShowing(): boolean {
+  if (isYouTube()) return youTubeAdShowing();
+  if (isTed()) return tedAdShowing();
+  return false;
+}
+
 async function openYouTubeTranscriptPanel(): Promise<boolean> {
   if (ytPanelRows().length) return true;
   const button =
@@ -292,9 +302,54 @@ async function cuesFromLoomList(video: HTMLVideoElement | null): Promise<{ cues:
   return { cues: rowsToCues(rows, video?.duration), label: 'Loom transcript' };
 }
 
+// ---------------------------------------------------------------- TED
+
+async function cuesFromTed(video: HTMLVideoElement | null): Promise<{ cues: Cue[]; label: string } | null> {
+  const talk = await loadTedTalk();
+  if (!talk) return null;
+  const rows = talk.cues.filter((c) => Number.isFinite(c.start) && c.text);
+  if (!rows.length) return null;
+  const duration = video && Number.isFinite(video.duration) && !tedAdShowing() ? video.duration : undefined;
+  return { cues: rowsToCues(rows, duration), label: `TED · ${talk.speaker || talk.title}` };
+}
+
+function tedLines(): TranscriptLine[] {
+  const talk = tedTalk();
+  if (!talk) return [];
+  return tedCueEls()
+    .map((el) => {
+      const cue = talk.cues[Number(el.dataset.cueIndex)];
+      // The page may show a translation; the words to type are the speaker's own.
+      const text = cue?.text || (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+      return { el, start: cue?.start ?? Number.NaN, text, speakerShown: false };
+    })
+    .filter((r) => Number.isFinite(r.start));
+}
+
+async function openTedTranscript(): Promise<boolean> {
+  const talk = await loadTedTalk();
+  if (!talk) return false;
+  if (!tedCueEls().length) openTedTranscriptButton()?.click();
+  // TED draws the transcript in pieces: wait for every cue, or for the count to stop changing.
+  let last = -1;
+  let steady = 0;
+  await waitFor(() => {
+    const n = tedCueEls().length;
+    steady = n && n === last ? steady + 1 : 0;
+    last = n;
+    return n >= talk.cues.length || steady >= 3 ? true : null;
+  }, 6000);
+  markTedSoundTags();
+  return tedLines().length > 0;
+}
+
 // ---------------------------------------------------------------- entry
 
 export async function detectSource(video: HTMLVideoElement | null): Promise<Source | null> {
+  if (isTed()) {
+    const ted = await cuesFromTed(video).catch(() => null);
+    if (ted) return { kind: 'ted', ...ted };
+  }
   if (isYouTube()) {
     const id = youTubeVideoId();
     if (id) {
@@ -361,14 +416,16 @@ export function transcriptLines(): TranscriptLine[] {
       })
       .filter((r) => r.el && Number.isFinite(r.start));
   }
+  if (isTed()) return tedLines();
   return [];
 }
 
 export const visibleTranscriptRows = transcriptLines;
 
-/** Open the site's transcript list (Loom's tab, YouTube's panel) if it has one. */
+/** Open the site's transcript list (Loom's tab, YouTube's panel, TED's transcript) if it has one. */
 export async function openSiteTranscript(): Promise<boolean> {
   if (isLoom()) return openLoomTranscript();
   if (isYouTube()) return openYouTubeTranscriptPanel().catch(() => false);
+  if (isTed()) return openTedTranscript().catch(() => false);
   return false;
 }

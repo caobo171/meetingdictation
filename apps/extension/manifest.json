@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "MeetingDictation",
-  "version": "0.2.0",
-  "description": "Practise listening on recorded meetings: type what you hear, line by line, on Loom, YouTube and Teams recordings.",
+  "version": "0.3.0",
+  "description": "Practise listening on recorded meetings and talks: type what you hear, line by line, on Loom, YouTube, TED and Teams recordings.",
   "permissions": [
     "storage",
     "activeTab",
@@ -33,6 +33,7 @@
         "https://www.loom.com/embed/*",
         "https://www.youtube.com/*",
         "https://m.youtube.com/*",
+        "https://www.ted.com/*",
         "https://*.sharepoint.com/*/_layouts/15/stream.aspx*",
         "https://teams.cloud.microsoft/*",
         "https://teams.microsoft.com/*"

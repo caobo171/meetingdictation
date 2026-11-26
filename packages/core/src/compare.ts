@@ -63,12 +63,36 @@ function unitsOf(word: string): string[] {
     .filter(Boolean);
 }
 
+/** A sound tag is at most this many words: "(Laughter)", "[Music]", "(Audience cheers)". */
+const SOUND_TAG_WORDS = 4;
+
+/**
+ * Which tokens sit inside a sound tag: what the captioner heard rather than
+ * what was said, in brackets (TED's "(Laughter)", YouTube's "[Music]"). They
+ * are shown, never asked for. A longer aside in brackets is speech.
+ */
+function soundTagged(tokens: string[]): boolean[] {
+  const out = tokens.map(() => false);
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (!/^[^\p{L}\p{N}]*[([]/u.test(tokens[i])) continue;
+    for (let j = i; j < Math.min(tokens.length, i + SOUND_TAG_WORDS); j += 1) {
+      if (/[)\]][^\p{L}\p{N}]*$/u.test(tokens[j])) {
+        out.fill(true, i, j + 1);
+        i = j;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export function tokenize(text: string): Token[] {
-  return (text || '')
+  const raws = (text || '')
     .replace(/[’‘]/g, "'")
     .split(/[\s—–/]+|(?<=\p{L})-(?=\p{L})/u)
-    .filter((w) => w.trim())
-    .map((raw) => ({ raw, units: unitsOf(raw) }));
+    .filter((w) => w.trim());
+  const sound = soundTagged(raws);
+  return raws.map((raw, i) => ({ raw, units: sound[i] ? [] : unitsOf(raw) }));
 }
 
 export type WordState = 'correct' | 'missing' | 'partial' | 'filler';
@@ -280,15 +304,21 @@ export interface BlankPart {
 
 /** Split a transcript line into blanks, one per spoken word, with its punctuation kept visible. */
 export function blankParts(text: string): BlankPart[] {
-  return (text || '')
+  const toks = (text || '')
     .replace(/[’‘]/g, "'")
     .split(/\s+/)
-    .filter(Boolean)
-    .map((tok) => {
-      const m = tok.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}%]*)$/u)!;
-      const word = m[2];
-      return { pre: m[1], word, post: m[3], filler: !!word && (unitsOf(word).length === 0 || SHOWN_WORDS.has(normalizeWord(word))) };
-    });
+    .filter(Boolean);
+  const sound = soundTagged(toks);
+  return toks.map((tok, i) => {
+    const m = tok.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}%]*)$/u)!;
+    const word = m[2];
+    return {
+      pre: m[1],
+      word,
+      post: m[3],
+      filler: !!word && (sound[i] || unitsOf(word).length === 0 || SHOWN_WORDS.has(normalizeWord(word))),
+    };
+  });
 }
 
 /** Does one typed word count as this transcript word? Same rules as grade(). */

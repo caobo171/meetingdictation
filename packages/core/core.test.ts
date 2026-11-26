@@ -147,6 +147,17 @@ describe('blanks', () => {
     expect(blankParts('— ok')[0]).toEqual({ pre: '—', word: '', post: '', filler: false });
   });
 
+  it('shows sound tags instead of asking for them', () => {
+    expect(hasWords('(Laughter)')).toBe(false);
+    expect(hasWords('[Music]')).toBe(false);
+    expect(hasWords('(Audience cheers) Thank you.')).toBe(true);
+    const parts = blankParts('So (Laughter) we went [upbeat music plays] home.');
+    expect(parts.filter((p) => p.filler).map((p) => p.word)).toEqual(['Laughter', 'upbeat', 'music', 'plays']);
+    expect(grade('So (Laughter) we went home.', 'so we went home').passed).toBe(true);
+    // A long aside in brackets is still speech.
+    expect(blankParts('(and this matters a great deal) yes').some((p) => p.filler)).toBe(false);
+  });
+
   it('matches one word the way grading does', () => {
     expect(wordMatches('Databricks,', 'databricks')).toBe(true);
     expect(wordMatches('two', '2')).toBe(true);

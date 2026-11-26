@@ -1,5 +1,5 @@
 /**
- * Entry point. Runs on its own on Loom, YouTube and Microsoft Stream (Teams
+ * Entry point. Runs on its own on Loom, YouTube, TED and Microsoft Stream (Teams
  * recordings) as a small "Dictation" pill, and on any other page when the
  * toolbar button is clicked: the background worker injects this same file, and
  * a second run toggles the panel.
@@ -7,6 +7,7 @@
 
 import { DictationPanel } from './panel';
 import { isStream, isYouTube } from './sources';
+import { isTed, tedSlug } from './ted';
 import { isTeams, startTeamsBridge, teamsRecording } from './teams';
 
 declare global {
@@ -25,9 +26,10 @@ if (existing) {
 } else {
   const panel = new DictationPanel();
   // Ran from the manifest (Loom / YouTube) → just the pill; ran from a click → open straight away.
-  const fromClick = !!(document as Document & { __mdClick?: boolean }).__mdClick || !(/loom\.com$|youtube\.com$/.test(location.hostname) || isStream() || isTeams());
+  const fromClick = !!(document as Document & { __mdClick?: boolean }).__mdClick || !(/loom\.com$|youtube\.com$/.test(location.hostname) || isTed() || isStream() || isTeams());
   window.__meetingDictation = { panel, injected: fromClick };
-  const onVideoPage = () => (isTeams() ? !!teamsRecording() : !isYouTube() || /^\/(watch|shorts|live)/.test(location.pathname));
+  const onVideoPage = () =>
+    isTeams() ? !!teamsRecording() : isTed() ? !!tedSlug() : !isYouTube() || /^\/(watch|shorts|live)/.test(location.pathname);
   if (fromClick) panel.open();
   else if (onVideoPage()) panel.showPill();
   else panel.close();
@@ -47,6 +49,20 @@ if (existing) {
     };
     document.addEventListener('yt-navigate-finish', onNav);
     window.addEventListener('popstate', onNav);
+  }
+
+  if (isTed()) {
+    // TED moves between talks without a page load, and has no event for it.
+    let lastSlug = tedSlug();
+    setInterval(() => {
+      const now = tedSlug();
+      if (now === lastSlug) return;
+      lastSlug = now;
+      if (!now) {
+        if (!panel.isStarted) panel.close();
+      } else if (panel.isStarted) void panel.restartForNewPage();
+      else panel.showPill();
+    }, 1000);
   }
 
   if (isTeams()) {

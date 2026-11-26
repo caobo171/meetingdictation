@@ -18,19 +18,20 @@ import { WordBox } from './wordbox';
 import { icon } from './icons';
 import { entryLines, renderedLines, scrollTowardEntry } from './onetranscript';
 import {
+  adShowing,
   cuesFromStream,
   detectSource,
   findVideo,
   isLoom,
   isStream,
   isTeams,
+  isTed,
   isYouTube,
   openSiteTranscript,
   transcriptLines,
   visibleTranscriptRows,
   wakePlayer,
   type TranscriptLine,
-  youTubeAdShowing,
   youTubeVideoId,
   type Source,
 } from './sources';
@@ -38,6 +39,7 @@ import { accountEmail, onAuthChange, openConnect, pullProgress, pushProgress } f
 import { actionFor, keyCaps, keys, loadKeys, onKeysChange, saveKeys, type KeyAction } from './keys';
 import { mountCheckbox, mountSelect, mountSettings } from './ui';
 import { RemoteInline, cuesFromTeams, teamsRecording } from './teams';
+import { tedLayout, tedTalk } from './ted';
 
 /**
  * YouTube enforces Trusted Types; a plain innerHTML assignment can throw there.
@@ -181,6 +183,9 @@ function fmt(t: number): string {
 }
 
 function pageTitle(): string {
+  // TED's document title is only "TED: Ideas change everything".
+  const talk = tedTalk();
+  if (talk) return (talk.speaker ? `${talk.title} · ${talk.speaker}` : talk.title).slice(0, 300);
   return (document.title || location.hostname).replace(/\s*[-|·]\s*(YouTube|Loom)\s*$/i, '').trim().slice(0, 300);
 }
 
@@ -189,6 +194,7 @@ function siteName(): string {
   if (/(^|\.)youtube\.com$/.test(location.hostname)) return 'youtube';
   if (isStream()) return 'stream';
   if (isTeams()) return 'teams';
+  if (isTed()) return 'ted';
   return location.hostname.replace(/^www\./, '');
 }
 
@@ -567,7 +573,7 @@ export class DictationPanel {
     setBlur(this.blur, this.video);
     this.status('Looking for the transcript…');
     this.typeIn = await typeInPref();
-    const hasList = isLoom() || isYouTube() || isTeamsList();
+    const hasList = isLoom() || isYouTube() || isTed() || isTeamsList();
     this.refs.typeInWrap.classList.toggle('hidden', !hasList);
     this.typeInBox.set(this.typeIn);
     if (hasList && this.typeIn && (await this.startTyping())) return;
@@ -593,10 +599,11 @@ export class DictationPanel {
   /** Turn the site's own transcript lines into blanks. False when the page has none. */
   private async startTyping(): Promise<boolean> {
     if (isTeamsList()) return this.startTypingTeams();
-    if (!typeableLines().length) await openSiteTranscript();
+    // TED's transcript may be only partly drawn: its opener waits for the rest.
+    if (!typeableLines().length || isTed()) await openSiteTranscript();
     const lines = typeableLines();
     if (!lines.length) return false;
-    const duration = this.video && Number.isFinite(this.video.duration) && !youTubeAdShowing() ? this.video.duration : 0;
+    const duration = this.video && Number.isFinite(this.video.duration) && !adShowing() ? this.video.duration : 0;
     this.lines = lines;
     this.typing = true;
     this.segments = lines.map((l, i) => ({
@@ -607,7 +614,7 @@ export class DictationPanel {
     }));
     this.results = {};
     this.index = 0;
-    await this.begin(`${isLoom() ? 'Loom' : 'YouTube'} transcript · ${lines.length} lines`);
+    await this.begin(`${isLoom() ? 'Loom' : isTed() ? 'TED' : 'YouTube'} transcript · ${lines.length} lines`);
     return true;
   }
 
@@ -740,6 +747,7 @@ export class DictationPanel {
   open(): void {
     if (!this.host.isConnected) document.documentElement.appendChild(this.host);
     this.collapse(false);
+    tedLayout(true);
     if (!this.started) {
       this.started = true;
       void this.start();
@@ -760,6 +768,7 @@ export class DictationPanel {
     clearInterval(this.watching);
     this.inline.detach();
     setBlur(false, this.video);
+    tedLayout(false);
     this.host.remove();
   }
 
@@ -1042,7 +1051,7 @@ export class DictationPanel {
       return;
     }
     if (!v || !this.segments.length) return;
-    if (isYouTube() && youTubeAdShowing()) {
+    if (adShowing()) {
       this.note('An ad is playing. Press 1 again when the video starts.');
       return;
     }

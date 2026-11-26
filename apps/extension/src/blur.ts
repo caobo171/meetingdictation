@@ -22,6 +22,9 @@ const BLUR_TARGETS = [
   'transcript-segment-view-model > [role="text"]',
   'transcript-segment-view-model > .ytAttributedStringHost',
   '.ytp-caption-window-container',
+  // TED: its transcript's cues, and the captions it draws over the video
+  '[data-cue-index]',
+  '#subtitles-container',
   // Microsoft Stream (Teams recordings on SharePoint / OneDrive)
   '#OneTranscript [data-transcript-copy-field="text"]',
   // Anything that calls itself a transcript or captions (Zoom, Teams/Stream, Drive, Vimeo, LMS players)
@@ -33,6 +36,7 @@ const BLUR_TARGETS = [
 
 /** Who is speaking and when: never part of the answer. Only the element itself: Teams' whole row is "listItemWithSpeaker". */
 const NEVER_BLUR = [
+  '[data-md-shown]',
   '[data-transcript-copy-field="speaker"]',
   '[data-transcript-copy-field="timestamp"]',
   '[class*="speakername" i]',

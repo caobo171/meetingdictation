@@ -23,6 +23,7 @@ Sign in to sync: the panel's footer links to the website's
 | --- | --- | --- |
 | Loom (`/share`, `/embed`) | the video's captions track; Loom's transcript list as fallback | a **Dictation** pill bottom-right |
 | YouTube watch pages | the caption track if YouTube serves it, else it opens YouTube's own transcript panel | a **Dictation** pill |
+| TED talks (`www.ted.com/talks/…`) | the whole transcript from the talk page's own data, in the language the speaker talks in | a **Dictation** pill |
 | Any other page with a `<video>` that has a captions/subtitles track | the track | toolbar button or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> |
 | Teams meeting recordings: the meeting's **Recap** in Teams on the web, or the recording's Stream page (`*.sharepoint.com/…/stream.aspx`) | the recording's full transcript from Stream's own API, with speakers | a **Dictation** pill |
 | Zoom, Meet, Drive, anything else | download the recording's `.vtt` / `.srt` and use **Load .vtt / .srt** in the panel | toolbar button |
@@ -89,6 +90,15 @@ Words you are never asked for ("uh", "hi", "then") are printed between the blank
 <kbd>Space</kbd> / <kbd>Tab</kbd> move to the next blank, <kbd>Backspace</kbd> on an empty one goes
 back. Drag the panel's bottom-right corner to resize it; the size is remembered.
 
+### TED
+
+On a talk page the pill opens dictation in TED's own transcript, which becomes the blanks (it presses
+**Read transcript** if the transcript isn't drawn yet). While the panel is open, the right-hand column
+holds only the transcript, right beside the video as on Loom: the ad block above it is hidden until
+the panel closes. TED's captions over the video are blurred. Sound notes such as "(Laughter)" and
+"(Applause)" stay readable and are never asked for. While TED's pre-roll ad plays, <kbd>1</kbd> waits
+for the talk. TED moves between talks without a page load; the panel starts over on the new talk.
+
 ### What stays visible
 
 Speaker names and times are never blurred. Greetings and small talk ("Hi, Mark. Hi, Joe.",
@@ -133,6 +143,7 @@ transcript (Loom, YouTube) un-blur once every segment in them is finished.
 - `@md/core` (`packages/core`) – grading, hints, transcript parsing, progress merge
 - `src/sync.ts`, `src/background.ts`, `src/connect.content.ts` – account sync
 - `src/sources.ts` – per-site transcript adapters
+- `src/ted.ts` – TED talks: the transcript from the talk page's data, its cue elements, the ad and the layout while practising
 - `src/stream.ts` – a Teams recording's transcript from Stream's API
 - `src/teams.ts` / `src/frame.ts` – Teams Recap: the Teams side, and the script in its SharePoint frames that drives the player and holds the blanks
 - `src/onetranscript.ts` – Teams' transcript list (rows matched to the API by entry id; a virtual list)
