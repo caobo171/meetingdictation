@@ -1,0 +1,9 @@
+[
+  { "slug": "benefits", "name": "Benefits", "nameVi": "Lợi ích", "sort": 1 },
+  { "slug": "learning-tips", "name": "Learning Tips", "nameVi": "Mẹo học", "sort": 2 },
+  { "slug": "learning-path", "name": "Learning Path", "nameVi": "Lộ trình", "sort": 3 },
+  { "slug": "work-english", "name": "English at Work", "nameVi": "Tiếng Anh công sở", "sort": 4 },
+  { "slug": "guides", "name": "Guides", "nameVi": "Hướng dẫn", "sort": 5 },
+  { "slug": "comparison", "name": "Comparison", "nameVi": "So sánh", "sort": 6 },
+  { "slug": "listening-sources", "name": "Listening Sources", "nameVi": "Nguồn nghe", "sort": 7 }
+]

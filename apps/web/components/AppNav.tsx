@@ -3,6 +3,7 @@
 import {
   Cog6ToothIcon,
   HomeIcon,
+  ShieldCheckIcon,
   PlusCircleIcon,
   PuzzlePieceIcon,
   RectangleStackIcon,
@@ -11,6 +12,7 @@ import {
 import {
   Cog6ToothIcon as Cog6ToothSolid,
   HomeIcon as HomeSolid,
+  ShieldCheckIcon as ShieldCheckSolid,
   PlusCircleIcon as PlusCircleSolid,
   PuzzlePieceIcon as PuzzlePieceSolid,
   RectangleStackIcon as RectangleStackSolid,
@@ -30,7 +32,9 @@ const ITEMS = [
   { href: '/app/settings', label: 'Settings', icon: Cog6ToothIcon, active: Cog6ToothSolid },
 ];
 
-export function AppNav({ variant }: { variant: 'side' | 'bottom' }) {
+const ADMIN_ITEMS = [{ href: '/admin', label: 'Admin', icon: ShieldCheckIcon, active: ShieldCheckSolid }];
+
+export function AppNav({ variant, admin = false }: { variant: 'side' | 'bottom'; admin?: boolean }) {
   const path = usePathname();
   const isActive = (href: string) => (href === '/app' ? path === '/app' : path.startsWith(href));
 
@@ -57,7 +61,7 @@ export function AppNav({ variant }: { variant: 'side' | 'bottom' }) {
 
   return (
     <nav className="grid gap-0.5">
-      {ITEMS.map((i) => {
+      {[...ITEMS, ...(admin ? ADMIN_ITEMS : [])].map((i) => {
         const on = isActive(i.href);
         const Icon = on ? i.active : i.icon;
         return (

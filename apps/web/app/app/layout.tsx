@@ -1,10 +1,12 @@
 import Link from 'next/link';
 
 import { signOut } from '@/auth';
+import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { AppNav } from '@/components/AppNav';
 import { Logo } from '@/components/Logo';
 import { TimeZoneCookie } from '@/components/TimeZoneCookie';
 import { UserMenu } from '@/components/UserMenu';
+import { isAdmin } from '@/lib/admin';
 import { requireUser } from '@/lib/session';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -21,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/app" className="mb-6 flex h-9 items-center px-2">
           <Logo size={26} />
         </Link>
-        <AppNav variant="side" />
+        <AppNav variant="side" admin={isAdmin(user)} />
         <div className="mt-auto border-t pt-3">
           <UserMenu user={me} signOut={doSignOut} />
         </div>
@@ -34,7 +36,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <UserMenu user={me} signOut={doSignOut} compact />
       </header>
 
-      <main className="min-w-0 px-4 pb-24 pt-6 sm:px-8 lg:pb-12 lg:pt-10">{children}</main>
+      <main className="min-w-0 pb-24 lg:pb-12">
+        <AnnouncementBanner audience="app" />
+        <div className="px-4 pt-6 sm:px-8 lg:pt-10">{children}</div>
+      </main>
       <AppNav variant="bottom" />
       <TimeZoneCookie />
     </div>

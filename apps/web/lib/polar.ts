@@ -114,9 +114,38 @@ type Order = {
   id: string;
   product_id: string;
   status?: string;
-  customer: Customer;
+  customer: Customer & { email?: string | null };
   metadata?: Record<string, unknown>;
+  total_amount?: number;
+  refunded_amount?: number;
+  currency?: string;
+  billing_reason?: string;
+  created_at?: string;
+  discount?: { code?: string | null } | null;
 };
+
+/** Keep a copy of every Polar order for our products, for the admin's orders, customers and revenue. */
+async function recordOrder(o: Order, u: User | null) {
+  const plan = o.product_id === process.env.POLAR_PRODUCT_LIFETIME ? 'lifetime' : 'yearly';
+  const status = o.status === 'refunded' ? 'refunded' : o.status === 'pending' ? 'pending' : 'paid';
+  const data = {
+    userId: u?.id ?? null,
+    email: u?.email ?? o.customer.email ?? '',
+    plan,
+    amount: o.total_amount ?? 0,
+    refundedAmount: o.refunded_amount ?? 0,
+    currency: (o.currency ?? 'usd').toLowerCase(),
+    status,
+    reason: o.billing_reason ?? null,
+    couponCode: o.discount?.code ?? null,
+    paidAt: status === 'pending' ? null : new Date(o.created_at ?? Date.now()),
+  };
+  await db.order.upsert({
+    where: { providerId: o.id },
+    update: data,
+    create: { ...data, provider: 'polar', providerId: o.id, createdAt: o.created_at ? new Date(o.created_at) : undefined },
+  });
+}
 
 async function userFor(c: Customer, metadata?: Record<string, unknown>): Promise<User | null> {
   const id = c.external_id ?? (typeof metadata?.userId === 'string' ? metadata.userId : null);
@@ -139,6 +168,10 @@ export async function applyEvent(type: string, data: unknown): Promise<boolean> 
     // Pro runs to the end of the paid (or trial) period, with a day's grace for a late renewal.
     const live = ['trialing', 'active', 'past_due'].includes(s.status) || (s.status === 'canceled' && !s.ended_at);
     const end = s.current_period_end ? new Date(new Date(s.current_period_end).getTime() + DAY) : null;
+    const subUntil = live ? end : new Date(s.ended_at ?? Date.now());
+    // Pro granted in the admin outlasts whatever Polar says.
+    const manual = u.manualProUntil && u.manualProUntil.getTime() > Date.now() ? u.manualProUntil : null;
+    const proUntil = manual && (!subUntil || manual > subUntil) ? manual : subUntil;
     await db.user.update({
       where: { id: u.id },
       data: {
@@ -146,20 +179,45 @@ export async function applyEvent(type: string, data: unknown): Promise<boolean> 
         subId: s.id,
         subStatus: s.status,
         subCancelAtEnd: !!s.cancel_at_period_end,
-        proUntil: live ? end : new Date(s.ended_at ?? Date.now()),
+        proUntil,
       },
     });
     return true;
   }
-  if (type === 'order.paid' || type === 'order.refunded') {
+  if (type === 'order.paid' || type === 'order.refunded' || type === 'order.updated') {
     const o = data as Order;
-    if (o.product_id !== process.env.POLAR_PRODUCT_LIFETIME) return true;
+    const ours = [process.env.POLAR_PRODUCT_LIFETIME, process.env.POLAR_PRODUCT_YEARLY].includes(o.product_id);
+    if (!ours) return true;
     const u = await userFor(o.customer, o.metadata);
     if (!u) return false;
+    await recordOrder(o, u);
+    if (o.product_id !== process.env.POLAR_PRODUCT_LIFETIME || type === 'order.updated') return true;
     // A partial refund keeps lifetime; only a full refund takes it back.
     const refunded = o.status === 'refunded';
     await db.user.update({ where: { id: u.id }, data: { polarCustomerId: o.customer.id, lifetime: !refunded } });
     return true;
   }
   return true;
+}
+
+/** Every order Polar has for our products, newest first, for a one-off import into the admin. */
+export async function importPolarOrders(maxPages = 20): Promise<{ imported: number; unmatched: number }> {
+  const token = process.env.POLAR_ACCESS_TOKEN;
+  if (!token) throw new Error('POLAR_ACCESS_TOKEN is not set');
+  let imported = 0;
+  let unmatched = 0;
+  for (let page = 1; page <= maxPages; page++) {
+    const res = await fetch(`${API}/v1/orders/?limit=100&page=${page}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    if (!res.ok) throw new Error(`Polar /v1/orders ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const body = (await res.json()) as { items: Order[]; pagination?: { max_page?: number } };
+    for (const o of body.items) {
+      if (![process.env.POLAR_PRODUCT_LIFETIME, process.env.POLAR_PRODUCT_YEARLY].includes(o.product_id)) continue;
+      const u = await userFor(o.customer, o.metadata);
+      if (!u) unmatched++;
+      await recordOrder(o, u);
+      imported++;
+    }
+    if (!body.pagination?.max_page || page >= body.pagination.max_page) break;
+  }
+  return { imported, unmatched };
 }

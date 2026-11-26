@@ -2,7 +2,8 @@ import { ArrowPathIcon, ArrowRightIcon, CheckBadgeIcon, CommandLineIcon, FireIco
 import Link from 'next/link';
 
 import { auth } from '@/auth';
-import { Logo, LogoMark } from '@/components/Logo';
+import { LogoMark } from '@/components/Logo';
+import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -82,29 +83,7 @@ export default async function Landing() {
 
   return (
     <div className="bg-background">
-      <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/">
-            <Logo size={26} />
-          </Link>
-          <nav className="flex items-center gap-2">
-            {signedIn ? (
-              <Button asChild size="sm">
-                <Link href="/app">Open dashboard</Link>
-              </Button>
-            ) : (
-              <>
-                <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-                  <Link href="/login">Sign in</Link>
-                </Button>
-                <Button asChild size="sm">
-                  <Link href="/signup">Get started</Link>
-                </Button>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
         <div>
@@ -176,17 +155,7 @@ export default async function Landing() {
         </Button>
       </section>
 
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground sm:px-6">
-          <Logo size={20} />
-          <span className="flex items-center gap-4">
-            <Link className="hover:text-foreground" href="/privacy">
-              Privacy
-            </Link>
-            <span>© {new Date().getFullYear()} MeetingDictation</span>
-          </span>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

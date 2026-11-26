@@ -82,3 +82,27 @@
   .label { @apply mb-1.5 block text-sm font-medium leading-none; }
   .kbd { @apply pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground; }
 }
+
+/* Blog article body (rendered Markdown). */
+@layer components {
+  .prose-blog { @apply text-[17px] leading-[1.8] text-foreground/90; }
+  .prose-blog > * + * { @apply mt-5; }
+  .prose-blog h2 { @apply mt-12 scroll-mt-20 text-2xl font-semibold leading-snug tracking-tight text-foreground; }
+  .prose-blog h3 { @apply mt-9 scroll-mt-20 text-xl font-semibold leading-snug tracking-tight text-foreground; }
+  .prose-blog h4 { @apply mt-7 font-semibold text-foreground; }
+  .prose-blog a { @apply font-medium text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary; }
+  .prose-blog strong { @apply font-semibold text-foreground; }
+  .prose-blog ul { @apply list-disc space-y-2 pl-6 marker:text-primary/60; }
+  .prose-blog ol { @apply list-decimal space-y-2 pl-6 marker:font-medium marker:text-muted-foreground; }
+  .prose-blog li > p { @apply mt-0; }
+  .prose-blog blockquote { @apply rounded-r-xl border-l-4 border-primary/50 bg-primary/5 px-5 py-3 text-foreground; }
+  .prose-blog code { @apply rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground; }
+  .prose-blog pre { @apply overflow-x-auto rounded-xl border bg-muted p-4 text-sm; }
+  .prose-blog pre code { @apply border-0 bg-transparent p-0; }
+  .prose-blog hr { @apply my-10 border-border; }
+  .prose-blog .table-wrap { @apply overflow-x-auto rounded-xl border; }
+  .prose-blog table { @apply w-full border-collapse text-[15px] leading-relaxed; }
+  .prose-blog th { @apply border-b bg-muted/60 px-4 py-2.5 text-left font-semibold text-foreground; }
+  .prose-blog td { @apply border-b px-4 py-2.5 align-top; }
+  .prose-blog tr:last-child td { @apply border-b-0; }
+}

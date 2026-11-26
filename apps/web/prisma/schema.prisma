@@ -20,6 +20,10 @@ model User {
   progress     Progress[]
   days         ActivityDay[]
   tokens       ExtToken[]
+  /// "user" | "admin" | "super_admin". Admins run content and support; super admins also billing, roles and
+  /// deletions. Addresses in ADMIN_EMAILS are super admins whatever this says.
+  role         String        @default("user")
+  orders       Order[]
 
   // Billing (Polar). Pro while `lifetime` is set or `proUntil` is in the future.
   polarCustomerId String?
@@ -28,6 +32,9 @@ model User {
   subStatus       String? // Polar's subscription status: trialing, active, past_due, canceled, …
   subCancelAtEnd  Boolean   @default(false)
   proUntil        DateTime?
+  /// Pro given in the admin (manual orders, grants) runs at least until here. Polar's subscription webhook
+  /// never sets proUntil earlier than this, so a renewal or trial update can't wipe out a manual grant.
+  manualProUntil  DateTime?
 }
 
 /// Polar webhook deliveries already applied, by their `webhook-id`, so a redelivery is a no-op.
@@ -112,4 +119,134 @@ model LoginCode {
 
   @@index([email, createdAt])
   @@index([ip, createdAt])
+}
+
+
+
+/// A blog topic, like WELE's blog categories. `name` is English, `nameVi` the Vietnamese label.
+model BlogCategory {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  name      String
+  nameVi    String?
+  sort      Int        @default(0)
+  posts     BlogPost[]
+  createdAt DateTime   @default(now())
+}
+
+/// A blog post in one locale. The same slug can exist once per locale (an "en" and a "vi" version).
+model BlogPost {
+  id              String        @id @default(cuid())
+  locale          String        @default("vi")
+  slug            String
+  title           String
+  excerpt         String        @default("")
+  /// Markdown (GFM tables, no raw HTML).
+  body            String
+  /// JSON string[]: the key takeaways box at the top of the post.
+  takeaways       String        @default("[]")
+  /// JSON string[].
+  tags            String        @default("[]")
+  image           String?
+  categoryId      String?
+  category        BlogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  /// "draft" | "published". A published post with a future publishedAt stays hidden until then (scheduled).
+  status          String        @default("draft")
+  publishedAt     DateTime?
+  metaTitle       String?
+  metaDescription String?
+  focusKeyword    String?
+  authorName      String        @default("MeetingDictation")
+  /// Minutes, computed from the body on save.
+  readingTime     Int           @default(1)
+  views           Int           @default(0)
+  /// "file": seeded from content/blog and still in sync with it. "admin": created or edited in the admin, so the
+  /// seed leaves it alone.
+  source          String        @default("admin")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([locale, slug])
+  @@index([locale, status, publishedAt])
+  @@index([categoryId])
+}
+
+/// A payment. Polar orders arrive through the webhook (provider "polar"); manual orders, such as a bank
+/// transfer, are created in the admin (provider "manual") and grant Pro when marked paid.
+model Order {
+  id             String    @id @default(cuid())
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Kept so the order still says who paid after the account is deleted.
+  email          String
+  provider       String    @default("manual") // "polar" | "manual"
+  /// Polar's order id; null for manual orders.
+  providerId     String?   @unique
+  plan           String // "yearly" | "lifetime"
+  /// The amount × 100, for every currency (cents for USD; VND 550 000 is stored as 55 000 000), after any discount.
+  amount         Int
+  refundedAmount Int       @default(0)
+  currency       String    @default("usd")
+  /// "pending" | "paid" | "refunded" | "canceled"
+  status         String    @default("pending")
+  /// Polar: purchase, subscription_create, subscription_cycle… Manual: "manual".
+  reason         String?
+  couponCode     String?
+  note           String?
+  createdBy      String?
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// A discount code for manual orders. (Codes typed at Polar's checkout are Polar discounts, managed in Polar.)
+model Coupon {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String?
+  /// "percent" (value 1-100) | "amount" (value in cents)
+  kind      String    @default("percent")
+  value     Int
+  /// Empty: every plan. Otherwise "yearly" or "lifetime".
+  plan      String?
+  maxUses   Int?
+  used      Int       @default(0)
+  active    Boolean   @default(true)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+/// A banner shown to signed-in learners (and on the landing page when `public`), like WELE's system announcements.
+model Announcement {
+  id        String    @id @default(cuid())
+  message   String
+  linkUrl   String?
+  linkLabel String?
+  /// "info" | "success" | "warning"
+  level     String    @default("info")
+  public    Boolean   @default(false)
+  active    Boolean   @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+/// Every change made in the admin: who, what, to which record.
+model AdminLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String
+  action     String // e.g. "user.grant_pro", "order.mark_paid"
+  targetType String? // "user" | "order" | "coupon" | …
+  targetId   String?
+  /// Short human-readable summary.
+  summary    String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
 }

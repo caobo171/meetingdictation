@@ -8,7 +8,7 @@ you missed. Same idea, keys and grading as WELE's podcast dictation.
 meetingdictation/
 ├── packages/core/   grading, hints, transcript parsing, progress merge (pure TS, tested)
 ├── apps/web/        Next.js 14 site: landing, sign-in, dashboard, practice, sync API
-└── apps/extension/  Chrome extension: dictation right on Loom, YouTube, any captioned video
+└── apps/extension/  Chrome extension: dictation right on Loom, YouTube, TED talks, any captioned video
 ```
 
 ## Run it locally
@@ -55,6 +55,49 @@ Load the extension: `chrome://extensions` → Developer mode → **Load unpacked
   <kbd>Enter</kbd> check / next, <kbd>Alt</kbd>+<kbd>H</kbd> hint,
   <kbd>Alt</kbd>+<kbd>A</kbd> answer, <kbd>Alt</kbd>+<kbd>←/→</kbd> move.
   Progress saves every few seconds and on tab close.
+
+## Blog
+
+Modelled on WELE's blog: `/blog` sends readers to their language (`/blog/vi`, `/blog/en`), which has a featured
+post, the latest posts, topics and most read. Topic pages are at `/blog/<locale>/category/<slug>`. A post page has a
+breadcrumb, key takeaways, a table of contents, "summarise with ChatGPT / Claude" links, tags, the next post, related
+posts and a sign-up box. There are also generated covers and share images, JSON-LD, `/blog/<locale>/rss.xml`,
+`/sitemap.xml` and `/robots.txt`.
+
+- **Content**: `apps/web/content/blog/<locale>/<slug>.md`, with frontmatter (title, category, publishedAt, excerpt,
+  meta fields, tags, takeaways) and a Markdown body. Topics are in `content/blog/categories.json`.
+- **Seed**: `npm run db:seed-blog -w @md/web` creates missing posts and updates the ones that came from the files.
+  It leaves alone any post that was created or edited in the admin, unless you pass `-- --force`. Add `-- --dry` to
+  only validate the files.
+- **Admin**: `/admin/blog`. You can create, edit, schedule (a future publish date) and delete posts there, and
+  edit topics at `/admin/blog/categories`.
+
+## Admin
+
+`/admin`, laid out like WELE's admin: a sidebar grouped into People, Billing, Content, Communication and System.
+Every change made there is written to the audit log.
+
+- **Access**: `User.role` is `user`, `admin` or `super_admin`. The addresses in `ADMIN_EMAILS` (comma separated)
+  are always super admins, which is how the first one gets in. An admin runs content and support: the dashboard,
+  users (read only), blog, blog topics, recordings and announcements. A super admin also has customers, orders,
+  subscriptions, coupons, the audit log and webhooks, can grant or remove Pro, can change roles and can delete
+  accounts. Everyone else gets a 404.
+- **Dashboard**: users, active learners, Pro count and revenue, with 30-day charts and the latest sign-ups, orders and
+  admin actions.
+- **Users**: search and filter by plan or role. The user page shows practice stats, recordings, recent practice,
+  extension browsers, orders and admin history. From there you can add a year of Pro, grant lifetime, set a Pro end
+  date, remove Pro, change the role, disconnect browsers and delete the account.
+- **Orders**: Polar orders are recorded by the webhook (`order.paid` / `order.refunded` / `order.updated`), and
+  **Import from Polar** backfills older ones. Manual orders (bank transfer, gifts) can use a coupon. They start
+  pending or paid, and **Mark paid** grants the plan. Refunds are recorded on the order; they don't move money.
+- **Pro granted by hand** is kept in `manualProUntil`. The Polar subscription webhook never sets `proUntil` earlier
+  than that, so a renewal or trial update can't wipe out a manual grant.
+- **Customers**: everyone who has paid, with the amount spent and first and last payment. **Subscriptions**: who
+  has Pro and why (active, trial, cancelling, past due, ending soon, lifetime, given by hand, ended).
+- **Coupons**: percent or fixed discounts for manual orders. They can be limited to a plan, a number of uses and an
+  expiry date. Codes typed at Polar's checkout are Polar discounts, set up in Polar.
+- **Announcements**: a banner across the app, and across the public site if marked public, with a start and end
+  date. Learners can dismiss it.
 
 ## Sync
 
