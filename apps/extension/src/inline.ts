@@ -440,13 +440,15 @@ export class InlineBlanks {
   }
 
   /** Score line i: fraction of blanks right. A word given by a hint completes the line but scores nothing. */
-  grade(i: number): { score: number; passed: boolean; wrong: number } {
+  grade(i: number): { score: number; passed: boolean; wrong: number; missed: string[] } {
     const blanks = this.inputs(i);
     const hinted = this.hinted.get(i);
     const right = blanks.map((b) => wordMatches(this.wordOf(i, b), b.value));
     const earned = right.filter((ok, k) => ok && !hinted?.has(k)).length;
     const correct = right.filter(Boolean).length;
-    return { score: earned / (blanks.length || 1), passed: correct === blanks.length, wrong: blanks.length - correct };
+    // The words of the blanks it got wrong or needed a hint for: what its flashcard asks again.
+    const missed = blanks.filter((_, k) => !right[k] || hinted?.has(k)).map((b) => this.wordOf(i, b));
+    return { score: earned / (blanks.length || 1), passed: correct === blanks.length, wrong: blanks.length - correct, missed };
   }
 
   /** Colour line i from its saved state: green right, red wrong, answers shown if revealed. */

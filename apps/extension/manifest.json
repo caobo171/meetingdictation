@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MeetingDictation",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Practise listening on recorded meetings and talks: type what you hear, line by line, on Loom, YouTube, TED and Teams recordings.",
   "permissions": [
     "storage",

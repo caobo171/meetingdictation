@@ -45,11 +45,29 @@ async function api(path: string, body: unknown): Promise<unknown> {
   return res.json();
 }
 
+/** Like api(), but hands back the server's message on an error (a daily limit, a sentence it refused). */
+async function apiWithMessage(path: string, body: unknown): Promise<{ ok: boolean; data: Record<string, unknown> | null }> {
+  const auth = await getAuth();
+  if (!auth) return { ok: false, data: { message: 'not-connected' } };
+  const res = await fetch(`${auth.app}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${auth.token}` },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) {
+    await chrome.storage.local.remove('mdAuth');
+    return { ok: false, data: { message: 'not-connected' } };
+  }
+  return { ok: res.ok, data: (await res.json().catch(() => null)) as Record<string, unknown> | null };
+}
+
 type Msg =
   | { type: 'md-status' }
   | { type: 'md-open-connect' }
+  | { type: 'md-open-cards' }
   | { type: 'md-pull'; key: string }
-  | { type: 'md-push'; payload: Record<string, unknown> };
+  | { type: 'md-push'; payload: Record<string, unknown> }
+  | { type: 'md-card'; payload: Record<string, unknown> };
 
 chrome.runtime.onMessage.addListener((msg: Msg, _sender, reply) => {
   (async () => {
@@ -63,6 +81,11 @@ chrome.runtime.onMessage.addListener((msg: Msg, _sender, reply) => {
         await chrome.tabs.create({ url: `${auth?.app ?? DEFAULT_APP}/extension/connect` });
         return { ok: true };
       }
+      case 'md-open-cards': {
+        const auth = await getAuth();
+        await chrome.tabs.create({ url: `${auth?.app ?? DEFAULT_APP}/app/cards` });
+        return { ok: true };
+      }
       case 'md-pull': {
         const data = (await api('/api/ext/progress', { action: 'get', key: msg.key })) as { progress?: unknown } | null;
         return { progress: data?.progress ?? null };
@@ -70,6 +93,10 @@ chrome.runtime.onMessage.addListener((msg: Msg, _sender, reply) => {
       case 'md-push': {
         const data = (await api('/api/ext/progress', { action: 'put', ...msg.payload })) as { progress?: unknown } | null;
         return { progress: data?.progress ?? null };
+      }
+      case 'md-card': {
+        const { ok, data } = await apiWithMessage('/api/ext/cards', msg.payload);
+        return ok ? { card: data?.card ?? null } : { error: String(data?.message ?? 'Something went wrong.') };
       }
       default:
         return null;

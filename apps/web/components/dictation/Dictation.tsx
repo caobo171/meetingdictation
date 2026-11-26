@@ -1,11 +1,13 @@
 'use client';
 
 import {
+  blankParts,
   buildSegments,
   grade,
   hasWords,
   hint,
   isDone,
+  missedWords,
   transcriptFingerprint,
   type Cue,
   type Grade,
@@ -24,10 +26,13 @@ import {
   MusicalNoteIcon,
   PauseIcon,
   PlayIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { cardRequest, selectionIn, type CardView, type Explanation } from '@/components/cards/client';
+import { ExplanationView } from '@/components/cards/ExplanationView';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -48,7 +53,17 @@ export interface DictationProps {
     cues: Cue[];
   };
   initial: { fp: string; index: number; results: Results } | null;
+  /** Flashcards already kept for this recording, by sentence index. */
+  cards?: Record<number, CardInfo>;
 }
+
+export interface CardInfo {
+  id: string;
+  focus: string | null;
+  explanation: Explanation | null;
+}
+
+const cardInfo = (c: CardView): CardInfo => ({ id: c.id, focus: c.focus, explanation: c.explanation });
 
 const PAD_BEFORE = 0.15;
 const PAD_AFTER = 0.35;
@@ -62,6 +77,15 @@ function fmt(t: number): string {
   const m = Math.floor((s % 3600) / 60);
   const sec = String(s % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
+/**
+ * The word that opens the sentence, typed in for the learner (WELE's full dictation shows each
+ * sentence's first word instead of asking for it). Empty when the line has one word to write.
+ */
+function openerOf(text: string): string {
+  const first = blankParts(text).find((p) => p.word && !(p.filler && !p.given));
+  return first?.given ? `${first.word} ` : '';
 }
 
 function localDay(): string {
@@ -100,7 +124,7 @@ function GradeView({ g, revealed }: { g: Grade; revealed: boolean }) {
   );
 }
 
-export function Dictation({ recording, initial }: DictationProps) {
+export function Dictation({ recording, initial, cards: initialCards }: DictationProps) {
   const segments: Segment[] = useMemo(
     () => buildSegments(recording.cues).filter((s) => hasWords(s.text)),
     [recording.cues],
@@ -117,6 +141,11 @@ export function Dictation({ recording, initial }: DictationProps) {
   const [rate, setRate] = useState(1);
   const [note, setNote] = useState('');
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [cards, setCards] = useState<Record<number, CardInfo>>(initialCards ?? {});
+  const [explaining, setExplaining] = useState(false);
+  const [explainError, setExplainError] = useState('');
+  const [selected, setSelected] = useState('');
+  const sentenceRef = useRef<HTMLDivElement>(null);
 
   const portRef = useRef<MediaPort | null>(null);
   const videoRef = useRef<HTMLVideoElement & HTMLAudioElement>(null);
@@ -233,8 +262,9 @@ export function Dictation({ recording, initial }: DictationProps) {
       setIndex(next);
       state.current.index = next;
       const r = state.current.results[next];
-      setTyped(r?.typed ?? '');
+      setTyped(r?.typed ?? openerOf(segments[next].text));
       setGraded(r ? { g: grade(segments[next].text, r.typed), revealed: r.revealed } : null);
+      setExplainError('');
       dirty.current = true;
       if (autoplay) window.setTimeout(() => playSegmentRef.current(true), 60);
       requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
@@ -260,6 +290,54 @@ export function Dictation({ recording, initial }: DictationProps) {
     dirty.current = true;
   };
 
+  // ------------------------------------------------------------ flashcards
+
+  /** The sentence at i with the lines around it, as a flashcard keeps it. */
+  const sentenceOf = (i: number) => {
+    const s = segments[i];
+    return {
+      sourceKey: `web:${recording.id}`,
+      sourceTitle: recording.title,
+      segIndex: i,
+      start: s.start,
+      end: s.end,
+      text: s.text,
+      before: segments[i - 1]?.text ?? null,
+      after: segments[i + 1]?.text ?? null,
+      speaker: s.speaker ?? null,
+    };
+  };
+
+  /** A miss becomes a flashcard: the sentence, with the words not heard as blanks. */
+  const keepMiss = (i: number, g: Grade) => {
+    const missed = missedWords(g);
+    if (!missed.length) return;
+    cardRequest({ action: 'miss', ...sentenceOf(i), missed })
+      .then((c) => c && setCards((prev) => ({ ...prev, [i]: { ...cardInfo(c), explanation: c.explanation ?? prev[i]?.explanation ?? null } })))
+      .catch(() => undefined);
+  };
+
+  const explain = async () => {
+    if (explaining || !graded || !(graded.g.passed || graded.revealed)) return;
+    const i = index;
+    setExplaining(true);
+    setExplainError('');
+    try {
+      const c = await cardRequest({ action: 'explain', ...sentenceOf(i), missed: missedWords(graded.g), focus: selected || null, force: !selected && !!cards[i]?.explanation });
+      if (c) setCards((prev) => ({ ...prev, [i]: cardInfo(c) }));
+    } catch (err) {
+      setExplainError((err as Error).message);
+    } finally {
+      setExplaining(false);
+    }
+  };
+
+  useEffect(() => {
+    const onSelect = () => setSelected(selectionIn(sentenceRef.current));
+    document.addEventListener('selectionchange', onSelect);
+    return () => document.removeEventListener('selectionchange', onSelect);
+  }, []);
+
   const check = () => {
     const prev = results[index];
     if (isDone(prev) && typed === prev.typed) {
@@ -267,7 +345,8 @@ export function Dictation({ recording, initial }: DictationProps) {
       else setNote('You reached the end of the recording.');
       return;
     }
-    if (!typed.trim()) {
+    // Nothing typed beyond the word we filled in: Enter plays the sentence, as with an empty box.
+    if (!typed.trim() || typed.trim() === openerOf(seg.text).trim()) {
       playSegment(true);
       return;
     }
@@ -275,6 +354,8 @@ export function Dictation({ recording, initial }: DictationProps) {
     const revealed = !!prev?.revealed;
     record({ typed, score: revealed ? prev.score : Math.max(prev?.score ?? 0, g.score), passed: g.passed, revealed });
     setGraded({ g, revealed });
+    // The first honest attempt decides what goes on the card; later checks of half-typed text would add noise.
+    if (!g.passed && !prev) keepMiss(index, g);
   };
 
   const giveHint = () => {
@@ -291,6 +372,7 @@ export function Dictation({ recording, initial }: DictationProps) {
     const prev = results[index];
     record({ typed, score: prev?.score ?? g.score, passed: g.passed, revealed: true });
     setGraded({ g, revealed: true });
+    if (!g.passed && !prev?.revealed) keepMiss(index, g);
     inputRef.current?.focus();
   };
 
@@ -319,6 +401,7 @@ export function Dictation({ recording, initial }: DictationProps) {
       const map: Record<string, () => void> = {
         KeyH: giveHint,
         KeyA: showAnswer,
+        KeyE: () => void explain(),
         KeyL: () => setLoop((l) => !l),
         ArrowLeft: () => goTo(index - 1, true),
         ArrowRight: () => goTo(index + 1, true),
@@ -381,6 +464,8 @@ export function Dictation({ recording, initial }: DictationProps) {
   const pct = Math.round((done / Math.max(1, segments.length)) * 100);
   const r = results[index];
   const passed = !!graded?.g.passed;
+  const canExplain = !!graded && (graded.g.passed || graded.revealed);
+  const card = cards[index];
 
   if (!seg) return <p className="text-ink-2">This recording has no sentences to practise.</p>;
 
@@ -541,9 +626,28 @@ export function Dictation({ recording, initial }: DictationProps) {
                           return `${Math.round(graded.g.score * 100)}% · ${n} word${n === 1 ? '' : 's'} to fix`;
                         })()}
                 </p>
-                <GradeView g={graded.g} revealed={graded.revealed} />
+                <div ref={sentenceRef}>
+                  <GradeView g={graded.g} revealed={graded.revealed} />
+                </div>
               </div>
             )}
+
+            {canExplain && card?.explanation ? (
+              <div className="mt-3 rounded-lg border bg-muted/40 p-4">
+                <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 font-medium text-primary">
+                    <SparklesIcon className="size-3.5" /> AI explanation
+                  </span>
+                  <Link href="/app/cards" className="hover:text-foreground">Saved to Flashcards</Link>
+                </div>
+                <ExplanationView e={card.explanation} focus={card.focus} />
+              </div>
+            ) : card ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                The words you missed are saved to <Link href="/app/cards" className="text-primary hover:underline">Flashcards</Link>.
+              </p>
+            ) : null}
+            {explainError && <p className="mt-2 text-sm text-destructive">{explainError}</p>}
 
             <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={check}>
@@ -552,7 +656,26 @@ export function Dictation({ recording, initial }: DictationProps) {
               </Button>
               <Button variant="outline" onClick={giveHint}>Hint</Button>
               <Button variant="outline" onClick={showAnswer}>Show answer</Button>
+              {canExplain && (
+                <Button
+                  variant="outline"
+                  // Keep the phrase selected in the sentence while the button is pressed.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void explain()}
+                  disabled={explaining}
+                  title="Explain with AI (Alt+E). Select a phrase in the sentence to ask about it."
+                  className="max-w-full"
+                >
+                  <SparklesIcon className="text-primary" />
+                  <span className="truncate">
+                    {explaining ? 'Explaining…' : selected ? `Explain “${selected}”` : card?.explanation ? 'Explain again' : 'Explain'}
+                  </span>
+                </Button>
+              )}
             </div>
+            {canExplain && !card?.explanation && !explaining && (
+              <p className="mt-2 text-xs text-muted-foreground">Not sure what it means? Select a phrase above, then Explain. It is saved to your flashcards.</p>
+            )}
 
             <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-4 text-xs text-muted-foreground">
               <span><span className="kbd">1</span> play</span>
@@ -560,6 +683,7 @@ export function Dictation({ recording, initial }: DictationProps) {
               <span><span className="kbd">Enter</span> check · next</span>
               <span><span className="kbd">Alt H</span> hint</span>
               <span><span className="kbd">Alt A</span> answer</span>
+              <span><span className="kbd">Alt E</span> explain</span>
               <span><span className="kbd">Alt ←/→</span> move</span>
               <span><span className="kbd">Ctrl 1</span> types “1”</span>
             </div>

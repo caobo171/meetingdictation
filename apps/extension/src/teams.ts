@@ -49,7 +49,7 @@ export interface LineSnapshot {
   i: number;
   typed: string;
   empty: boolean;
-  grade: { score: number; passed: boolean; wrong: number };
+  grade: { score: number; passed: boolean; wrong: number; missed?: string[] };
 }
 
 export type FromFrame =
@@ -329,7 +329,7 @@ export class RemoteInline {
     return this.snaps.get(i)?.empty ?? true;
   }
 
-  grade(i: number): { score: number; passed: boolean; wrong: number } {
+  grade(i: number): { score: number; passed: boolean; wrong: number; missed?: string[] } {
     return this.snaps.get(i)?.grade ?? { score: 0, passed: false, wrong: 1 };
   }
 

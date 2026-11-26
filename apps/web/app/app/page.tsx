@@ -1,4 +1,5 @@
 import {
+  BookOpenIcon,
   ChartBarIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -14,6 +15,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { ProgressList } from '@/components/ProgressList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { db } from '@/lib/db';
 import { dashboardStats } from '@/lib/progress';
 import { requireUser } from '@/lib/session';
 import { learnerToday } from '@/lib/today';
@@ -37,7 +39,10 @@ function Stat({ label, value, hint, icon: Icon }: { label: string; value: string
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const s = await dashboardStats(user.id, await learnerToday());
+  const [s, dueCount] = await Promise.all([
+    dashboardStats(user.id, await learnerToday()),
+    db.card.count({ where: { userId: user.id, due: { lte: new Date() } } }),
+  ]);
   const first = (user.name ?? '').split(' ')[0];
   const practisedToday = s.last14[13].segments > 0;
   const week = s.last14.slice(7).reduce((a, d) => a + d.segments, 0);
@@ -56,6 +61,24 @@ export default async function Dashboard() {
           </Button>
         }
       />
+
+      {dueCount > 0 && (
+        <Link
+          href="/app/cards"
+          className="flex items-center gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <BookOpenIcon className="size-5 text-primary" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">
+              {dueCount} flashcard{dueCount === 1 ? '' : 's'} to review
+            </span>
+            <span className="block text-xs text-muted-foreground">Sentences you missed or asked about, back at the right time so they stick.</span>
+          </span>
+          <span className="shrink-0 text-sm font-medium text-primary">Review</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Streak" value={`${s.streak} ${s.streak === 1 ? 'day' : 'days'}`} hint={practisedToday ? 'Practised today' : 'Not practised today yet'} icon={FireIcon} />

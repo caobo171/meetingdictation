@@ -41,7 +41,7 @@ export class WordBox {
     this.blanks = this.parts.map((p, k) => {
       if (!p.word || p.filler) {
         const span = document.createElement('span');
-        span.className = 'w-text';
+        span.className = p.given ? 'w-text w-given' : 'w-text';
         span.textContent = `${p.pre}${p.word}${p.post}`;
         this.el.append(span);
         return null;

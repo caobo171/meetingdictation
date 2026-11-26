@@ -152,10 +152,11 @@ describe('blanks', () => {
     expect(hasWords('[Music]')).toBe(false);
     expect(hasWords('(Audience cheers) Thank you.')).toBe(true);
     const parts = blankParts('So (Laughter) we went [upbeat music plays] home.');
-    expect(parts.filter((p) => p.filler).map((p) => p.word)).toEqual(['Laughter', 'upbeat', 'music', 'plays']);
+    const shown = new Set(parts.filter((p) => p.filler && !p.given).map((p) => p.word));
+    expect(shown).toEqual(new Set(['Laughter', 'upbeat', 'music', 'plays']));
     expect(grade('So (Laughter) we went home.', 'so we went home').passed).toBe(true);
     // A long aside in brackets is still speech.
-    expect(blankParts('(and this matters a great deal) yes').some((p) => p.filler)).toBe(false);
+    expect(blankParts('(and this matters a great deal) yes').some((p) => p.filler && !p.given)).toBe(false);
   });
 
   it('matches one word the way grading does', () => {
@@ -165,6 +166,24 @@ describe('blanks', () => {
     expect(wordMatches('see', 'sea')).toBe(false);
     expect(wordMatches("Let's", "let's")).toBe(true);
     expect(wordMatches('the', '')).toBe(false);
+  });
+});
+
+describe('sentence openers (WELE)', () => {
+  const opened = (t: string) => blankParts(t).filter((p) => p.given).map((p) => p.word);
+  it('shows the first word of each sentence, and only that word', () => {
+    expect(opened("We're gonna push the launch. Legal signs off first.")).toEqual(["We're", 'Legal']);
+    expect(opened('He said "we ship Friday" and left')).toEqual(['He', 'we', 'and']);
+  });
+  it('blanks the word after a question or exclamation, as WELE does', () => {
+    expect(opened('Ready? Let us go!')).toEqual(['Ready']);
+  });
+  it('leaves an opening filler shown and asks for the word after it', () => {
+    expect(opened('Uh, we can circle back.')).toEqual([]);
+  });
+  it('keeps a lone word as a blank so there is always something to type', () => {
+    expect(opened('Exactly.')).toEqual([]);
+    expect(blankParts('Exactly.')[0].filler).toBe(false);
   });
 });
 
@@ -181,5 +200,27 @@ describe('isSmallTalk', () => {
   });
   it('shows hi and then inside a line instead of blanking them', () => {
     expect(blankParts('Then we hi go').map((p) => p.filler)).toEqual([true, false, true, false]);
+  });
+});
+
+describe('cards', () => {
+  it('collects the missed words of a grade', async () => {
+    const { missedWords } = await import('./src/cards');
+    expect(missedWords(grade("We're gonna ship it, by Friday.", "we're ship it by"))).toEqual(['gonna', 'Friday']);
+  });
+
+  it('merges missed words once each', async () => {
+    const { mergeMissed } = await import('./src/cards');
+    expect(mergeMissed(['gonna', 'Friday'], ['friday', 'ship'])).toEqual(['gonna', 'Friday', 'ship']);
+  });
+
+  it('blanks missed words and keeps punctuation outside', async () => {
+    const { clozeParts, clozeAnswer } = await import('./src/cards');
+    expect(clozeParts('Ship it by Friday, okay?', ['Friday'])).toEqual([
+      { text: 'Ship it by ', blank: false },
+      { text: 'Friday', blank: true },
+      { text: ', okay?', blank: false },
+    ]);
+    expect(clozeAnswer("Let's sync on the roadmap, then the roadmap review.", ['roadmap'])).toBe('roadmap roadmap');
   });
 });

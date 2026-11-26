@@ -56,6 +56,28 @@ Load the extension: `chrome://extensions` → Developer mode → **Load unpacked
   <kbd>Alt</kbd>+<kbd>A</kbd> answer, <kbd>Alt</kbd>+<kbd>←/→</kbd> move.
   Progress saves every few seconds and on tab close.
 
+## Flashcards
+
+As on WELE, a dictation miss becomes a flashcard. The first honest check of a
+sentence that has words wrong, or **Show answer**, keeps the sentence on a
+`Card` with the words not heard, the lines before and after it and where it came
+from (`web:<id>` or the extension's page key). It happens on the website and in
+the extension; one card per sentence, missed words add up.
+
+- **Explain (AI)**: once the sentence is shown, **Explain** (<kbd>Alt</kbd>+<kbd>E</kbd>)
+  asks the AI what it means in this meeting; select a phrase first to ask about
+  just that. The answer (meaning, the phrase, phrases worth keeping, why the
+  missed words were hard to hear) goes on the sentence's card, in the language
+  set under Settings → *AI explanations* (picked from the browser at first). 10 a
+  day free, 200 on Pro (`AiDay`); a cached answer is free. Runs on OpenAI
+  `gpt-6-luna` (`OPENAI_API_KEY`) as WELE's text tasks do; `LLM_BACKEND=anthropic`
+  moves it to Claude (`ANTHROPIC_API_KEY`). See `lib/explain.ts`.
+- **Review** at `/app/cards`: FSRS scheduling (ts-fsrs), Again / Hard / Good /
+  Easy with the next interval on each. A card with missed words is a cloze:
+  type them, and the clip plays when the recording is on the website (upload or
+  YouTube). A card from Explain alone asks for its meaning. Cards rated into a
+  short learning step come back in the same session. Home shows how many are due.
+
 ## Blog
 
 Modelled on WELE's blog: `/blog` sends readers to their language (`/blog/vi`, `/blog/en`), which has a featured

@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { signOut } from '@/auth';
@@ -11,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { EXPLAIN_LIMIT } from '@/lib/cards';
 import { db } from '@/lib/db';
+import { EXPLAIN_LANGS, langFromHeader } from '@/lib/explain';
 import { requireUser } from '@/lib/session';
 
 export const metadata = { title: 'Settings' };
@@ -26,6 +29,14 @@ export default async function Settings(props: { searchParams: Promise<{ delete?:
     const name = String(form.get('name') ?? '').trim().slice(0, 80);
     if (name) await db.user.update({ where: { id: u.id }, data: { name } });
     revalidatePath('/app', 'layout');
+  }
+
+  async function saveExplainLang(form: FormData) {
+    'use server';
+    const u = await requireUser();
+    const lang = String(form.get('explainLang') ?? '');
+    if (lang in EXPLAIN_LANGS) await db.user.update({ where: { id: u.id }, data: { explainLang: lang } });
+    revalidatePath('/app/settings');
   }
 
   async function deleteAccount(form: FormData) {
@@ -56,6 +67,36 @@ export default async function Settings(props: { searchParams: Promise<{ delete?:
               <Label htmlFor="email">Email</Label>
               <Input id="email" value={user.email} disabled readOnly />
             </div>
+          </CardContent>
+          <CardFooter className="border-t px-6 py-4">
+            <Button>Save</Button>
+          </CardFooter>
+        </form>
+      </Card>
+
+      <Card>
+        <form action={saveExplainLang}>
+          <CardHeader>
+            <CardTitle className="text-base">AI explanations</CardTitle>
+            <CardDescription>
+              The language Explain answers in, on the website, in the extension and on your flashcards. {EXPLAIN_LIMIT.free} a day on
+              the free plan, {EXPLAIN_LIMIT.pro} on Pro.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="explainLang">Explain in</Label>
+            <select
+              id="explainLang"
+              name="explainLang"
+              defaultValue={user.explainLang ?? langFromHeader((await headers()).get('accept-language'))}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm sm:w-64"
+            >
+              {Object.entries(EXPLAIN_LANGS).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
             <Button>Save</Button>

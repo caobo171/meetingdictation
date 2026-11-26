@@ -27,6 +27,10 @@ export function openConnect(): void {
   void send({ type: 'md-open-connect' });
 }
 
+export function openCards(): void {
+  void send({ type: 'md-open-cards' });
+}
+
 export async function pullProgress(key: string): Promise<RemoteProgress | null> {
   return (await send<{ progress: RemoteProgress | null }>({ type: 'md-pull', key }))?.progress ?? null;
 }
@@ -34,6 +38,28 @@ export async function pullProgress(key: string): Promise<RemoteProgress | null> 
 export async function pushProgress(payload: Record<string, unknown>): Promise<boolean> {
   const r = await send<{ progress?: unknown; error?: string }>({ type: 'md-push', payload });
   return !!r?.progress;
+}
+
+/** An AI explanation of a sentence, as the website returns it on a card. */
+export interface Explanation {
+  meaning: string;
+  focus: string;
+  phrases: { text: string; meaning: string }[];
+  listening: string;
+}
+
+export interface RemoteCard {
+  id: string;
+  focus: string | null;
+  explanation: Explanation | null;
+}
+
+/**
+ * Flashcards on the account: { action: "miss" | "explain", ...sentence }. The
+ * error is "not-connected" when no account is connected.
+ */
+export async function cardRequest(payload: Record<string, unknown>): Promise<{ card?: RemoteCard | null; error?: string }> {
+  return (await send<{ card?: RemoteCard | null; error?: string }>({ type: 'md-card', payload })) ?? { error: 'The extension could not reach the website.' };
 }
 
 export function onAuthChange(fn: () => void): void {

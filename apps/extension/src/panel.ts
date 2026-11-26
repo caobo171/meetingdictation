@@ -11,7 +11,7 @@
  */
 
 import { setBlur } from './blur';
-import { grade, hasWords, isSmallTalk, type Grade } from '@md/core';
+import { grade, hasWords, isSmallTalk, missedWords, type Grade } from '@md/core';
 import { buildSegments, mergeResults, parseSubtitleFile, transcriptFingerprint, type Segment } from '@md/core';
 import { InlineBlanks, type LineState } from './inline';
 import { WordBox } from './wordbox';
@@ -35,7 +35,7 @@ import {
   youTubeVideoId,
   type Source,
 } from './sources';
-import { accountEmail, onAuthChange, openConnect, pullProgress, pushProgress } from './sync';
+import { accountEmail, cardRequest, onAuthChange, openCards, openConnect, pullProgress, pushProgress, type RemoteCard } from './sync';
 import { actionFor, keyCaps, keys, loadKeys, onKeysChange, saveKeys, type KeyAction } from './keys';
 import { mountCheckbox, mountSelect, mountSettings } from './ui';
 import { RemoteInline, cuesFromTeams, teamsRecording } from './teams';
@@ -212,6 +212,7 @@ const STYLE = `
 .answer:focus-within { border-color: #c7d2fe; }
 .words { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; font-size: 15px; }
 .w-text { padding: 0 1px; color: #5d6276; }
+.w-given { color: #1f2333; font-weight: 500; }
 .speaker { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 13px; font-weight: 600; color: #4f46e5; }
 .speaker.hidden { display: none; }
 .wrap:not(.typing) .meta .who { display: none; }
@@ -280,6 +281,20 @@ textarea.pass { border-color: #22c55e; }
 .verdict.good { color: #15803d; }
 .verdict.bad { color: #c2410c; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.actions [data-act="explain"] svg { color: #4f46e5; }
+.actions [data-act="explain"] span { max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.explain { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid #e3e5ee; border-radius: 10px; background: #f8f9fd; font-size: 13px; line-height: 1.5; }
+.explain p { margin: 0; }
+.explain .ex-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #4f46e5; font-weight: 600; }
+.explain .ex-head a { color: #5d6276; font-weight: 400; cursor: pointer; }
+.explain .ex-focus { border-left: 2px solid #6366f1; padding: 2px 0 2px 8px; }
+.explain .ex-focus b { display: block; }
+.explain dl { margin: 0; display: grid; gap: 3px; }
+.explain dt { display: inline; font-weight: 600; }
+.explain dd { display: inline; margin: 0 0 0 6px; color: #5d6276; }
+.explain .ex-listen, .explain .ex-note { color: #5d6276; }
+.explain .ex-note a { color: #4f46e5; cursor: pointer; }
+.explain .ex-err { color: #c2410c; }
 .actions .spacer { flex: 1; }
 footer { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid #eef0f6; font-size: 12px; color: #5d6276; flex-wrap: wrap; }
 footer label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
@@ -314,7 +329,7 @@ kbd { font: 11px ui-monospace, monospace; background: #f1f2f7; border: 1px solid
   .w-blank { background: #1c1e29; border-color: #2f3242; color: #e7e9f3; }
   .w-blank:focus { background: #151720; border-color: #818cf8; }
   .w-blank.rev { background: #33270f; border-color: #5c4516; color: #fbbf24; }
-  .w-text, .w-row { color: #9aa0b4; }   button.sel:hover, button.keybtn:hover { background: #1f2230; }
+  .w-text, .w-row { color: #9aa0b4; } .w-given { color: #e7e9f3; }   button.sel:hover, button.keybtn:hover { background: #1f2230; }
   .sel-menu { background: #1c1e29; border-color: #2f3242; color: #e7e9f3; }
   .sel-item[data-highlighted] { background: #312e81; color: #e0e7ff; }
   button.check-box { background: #151720; border-color: #4b4f66; }
@@ -323,6 +338,9 @@ kbd { font: 11px ui-monospace, monospace; background: #f1f2f7; border: 1px solid
   button.keybtn.listening { background: #312e81; color: #e0e7ff; }
   footer { border-color: #2a2d3b; }
   kbd { background: #262938; border-color: #393d50; color: #e7e9f3; }
+  .explain { background: #151720; border-color: #393d50; }
+  .explain dd, .explain .ex-listen, .explain .ex-note, .explain .ex-head a { color: #a3a8bd; }
+  .explain .ex-head, .actions [data-act="explain"] svg { color: #a5b4fc; }
   .result .ok { color: #4ade80; } .result .ans { color: #f87171; } .result .wrong { color: #f87171; }
   .result .gap, .result .fill { color: #6b7087; }
 }
@@ -365,10 +383,12 @@ const TEMPLATE = `
         <div class="verdict bad hidden" data-ref="note"></div>
         <div class="verdict" data-ref="verdict"></div>
         <div class="result" data-ref="result"></div>
+        <div class="explain hidden" data-ref="explain"></div>
         <div class="actions">
           <button class="b primary" data-act="check">${icon.check()}<span>Check</span></button>
           <button class="b" data-act="hint" title="Alt+H">Hint</button>
           <button class="b" data-act="answer" title="Alt+A">Show answer</button>
+          <button class="b hidden" data-act="explain" data-ref="explainBtn" title="Explain with AI (Alt+E). Select a phrase in the sentence to ask about it.">${icon.sparkles(14)}<span data-ref="explainLabel">Explain</span></button>
           <span class="spacer"></span>
           <button class="b" data-act="here" title="Go to the segment at the video's current time">${icon.here()}<span>Here</span></button>
         </div>
@@ -413,6 +433,10 @@ export class DictationPanel {
   private lastTick = 0;
   private pushTimer = 0;
   private email: string | null = null;
+  /** Flashcards kept on the account for this recording's sentences, by index (this page only). */
+  private cards: Record<number, RemoteCard> = {};
+  private explaining = false;
+  private explainError = '';
   private source: Source | null = null;
   /** Typing straight into the site's transcript lines instead of the box. */
   private typing = false;
@@ -464,6 +488,9 @@ export class DictationPanel {
     // The keys work wherever the focus is, not only in a blank: clicking the video moves
     // focus to the page, and the site's player would take 1/2/3 (YouTube jumps to 10/20/30%).
     window.addEventListener('keydown', (e) => this.onPageKey(e), true);
+    document.addEventListener('selectionchange', () => this.drawExplainButton());
+    // Keep a phrase selected in the sentence while Explain is pressed.
+    this.refs.explainBtn.addEventListener('mousedown', (e) => e.preventDefault());
     this.refs.input.append(this.box.el);
     const portal = this.root.querySelector<HTMLElement>('.wrap')!;
     this.rateSel = mountSelect(this.refs.rate, portal, {
@@ -807,6 +834,8 @@ export class DictationPanel {
       this.refs.pos.textContent = `Line ${this.index + 1} / ${this.segments.length} · ${fmt(seg.start)}`;
       this.refs.who.textContent = seg.speaker ?? '';
       this.updateStats();
+      this.explainError = '';
+      this.drawExplain();
       void this.save();
       return;
     }
@@ -820,6 +849,8 @@ export class DictationPanel {
     this.refs.speakerName.textContent = seg.speaker ?? '';
     this.refs.speaker.classList.toggle('hidden', !seg.speaker);
     this.updateStats();
+    this.explainError = '';
+    this.drawExplain();
     void this.save();
   }
 
@@ -914,9 +945,11 @@ export class DictationPanel {
     const g = this.inline.grade(i);
     // One submission per line: the sentence is shown after it, so a miss counts as seen (and done).
     this.results[i] = { typed, score: Math.max(prev?.score ?? 0, g.score), passed: g.passed, revealed: !g.passed };
+    if (!g.passed && !prev) this.keepMissedWords(i, g.missed);
     this.inline.paint(i);
     this.inline.focus(i);
     this.lineVerdict(this.results[i]);
+    this.drawExplain();
     this.updateStats();
     void this.save();
   }
@@ -951,9 +984,131 @@ export class DictationPanel {
       revealed: revealed || !g.passed,
     };
     this.renderGrade(g, true, revealed ? prev.score : honest);
+    // The first honest attempt decides the card; checks of half-typed text later would add noise.
+    if (!g.passed && !prev) this.keepMiss(this.index, g);
     this.updateStats();
     this.revealRows();
+    this.drawExplain();
     void this.save();
+  }
+
+  // ------------------------------------------------------------ flashcards & AI
+
+  /** Sentence i with the lines around it, as a flashcard keeps it. */
+  private sentenceOf(i: number) {
+    const s = this.segments[i];
+    return {
+      sourceKey: this.progressKey,
+      sourceTitle: pageTitle(),
+      sourceUrl: location.href,
+      segIndex: i,
+      start: s.start,
+      end: s.end,
+      text: s.text,
+      before: this.segments[i - 1]?.text ?? null,
+      after: this.segments[i + 1]?.text ?? null,
+      speaker: s.speaker ?? null,
+    };
+  }
+
+  /** A miss becomes a flashcard on the account (as on WELE): the sentence, with the words not heard as blanks. */
+  private keepMiss(i: number, g: Grade): void {
+    this.keepMissedWords(i, missedWords(g));
+  }
+
+  /**
+   * In the transcript's own blanks the panel has no full typed sentence (shown words are not
+   * typed), so the blanks report which of their words were missed.
+   */
+  private keepMissedWords(i: number, words: string[] | undefined): void {
+    if (!this.email) return;
+    const missed = (words ?? []).map((w) => w.replace(/^[^\p{L}\p{N}%]+|[^\p{L}\p{N}%]+$/gu, '')).filter(Boolean);
+    if (!missed.length) return;
+    void cardRequest({ action: 'miss', ...this.sentenceOf(i), missed }).then((r) => {
+      if (!r.card) return;
+      this.cards[i] = { ...r.card, explanation: r.card.explanation ?? this.cards[i]?.explanation ?? null };
+      if (i === this.index) this.drawExplain();
+    });
+  }
+
+  /** The phrase of the current sentence the learner selected, in the panel or on the page. */
+  private selectedPhrase(): string {
+    const inPanel = (this.root as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.()?.toString() ?? '';
+    const text = (inPanel || window.getSelection()?.toString() || '').replace(/\s+/g, ' ').trim();
+    const seg = this.segments[this.index];
+    return text && text.length <= 200 && seg?.text.toLowerCase().replace(/\s+/g, ' ').includes(text.toLowerCase()) ? text : '';
+  }
+
+  private canExplain(): boolean {
+    const r = this.results[this.index];
+    return !!r && (r.passed || r.revealed);
+  }
+
+  private drawExplainButton(): void {
+    const btn = this.refs.explainBtn as HTMLButtonElement | undefined;
+    if (!btn) return;
+    btn.classList.toggle('hidden', !this.canExplain());
+    btn.disabled = this.explaining;
+    const phrase = this.selectedPhrase();
+    this.refs.explainLabel.textContent = this.explaining
+      ? 'Explaining…'
+      : phrase
+        ? `Explain “${phrase}”`
+        : this.cards[this.index]?.explanation
+          ? 'Explain again'
+          : 'Explain';
+  }
+
+  /** The explanation under the sentence, or a note that the miss is on a flashcard. */
+  private drawExplain(): void {
+    this.drawExplainButton();
+    const box = this.refs.explain;
+    const card = this.cards[this.index];
+    const parts: string[] = [];
+    if (this.canExplain() && card?.explanation) {
+      const e = card.explanation;
+      parts.push(`<div class="ex-head"><span>AI explanation</span><a data-act="cards">Saved to Flashcards</a></div>`);
+      parts.push(`<p>${esc(e.meaning)}</p>`);
+      if (card.focus && e.focus) parts.push(`<div class="ex-focus"><b>“${esc(card.focus)}”</b>${esc(e.focus)}</div>`);
+      if (e.phrases.length) parts.push(`<dl>${e.phrases.map((p) => `<div><dt>${esc(p.text)}</dt><dd>${esc(p.meaning)}</dd></div>`).join('')}</dl>`);
+      if (e.listening) parts.push(`<p class="ex-listen">${esc(e.listening)}</p>`);
+    } else if (card && this.canExplain()) {
+      parts.push(`<p class="ex-note">The words you missed are saved to your <a data-act="cards">flashcards</a>. Not sure what it means? Select a phrase, then Explain.</p>`);
+    }
+    if (this.explainError === 'not-connected') {
+      parts.push(`<p class="ex-note"><a data-act="connect">Connect your MeetingDictation account</a> to explain sentences with AI and keep them as flashcards.</p>`);
+    } else if (this.explainError) parts.push(`<p class="ex-err">${esc(this.explainError)}</p>`);
+    box.classList.toggle('hidden', !parts.length);
+    setHTML(box, parts.join(''));
+  }
+
+  private async explain(): Promise<void> {
+    if (this.explaining || !this.canExplain()) return;
+    const i = this.index;
+    if (!this.email) {
+      this.explainError = 'not-connected';
+      this.drawExplain();
+      return;
+    }
+    const focus = this.selectedPhrase();
+    // In the transcript's own blanks the shown words are not typed, so ask the blanks what was missed.
+    const missed = this.typing ? (this.inline.grade(i).missed ?? []) : missedWords(grade(this.segments[i].text, this.results[i].typed));
+    this.explaining = true;
+    this.explainError = '';
+    this.drawExplain();
+    const r = await cardRequest({
+      action: 'explain',
+      ...this.sentenceOf(i),
+      missed,
+      focus: focus || null,
+      force: !focus && !!this.cards[i]?.explanation,
+      lang: navigator.language,
+    });
+    this.explaining = false;
+    if (r.card) this.cards[i] = r.card;
+    this.explainError = r.error ?? '';
+    if (i === this.index) this.drawExplain();
+    else this.drawExplainButton();
   }
 
   private giveHint(): void {
@@ -971,8 +1126,10 @@ export class DictationPanel {
       const g = this.inline.grade(i);
       const prev = this.results[i];
       this.results[i] = { typed, score: prev?.score ?? g.score, passed: g.passed, revealed: true };
+      if (!g.passed && !prev?.revealed) this.keepMissedWords(i, g.missed);
       this.inline.paint(i);
       this.lineVerdict(this.results[i]);
+      this.drawExplain();
       this.updateStats();
       void this.save();
       return;
@@ -983,8 +1140,10 @@ export class DictationPanel {
     this.box.revealAll();
     this.results[this.index] = { typed: this.box.value, score: prev?.score ?? g.score, passed: g.passed, revealed: true };
     this.renderGrade(g, true, prev?.score ?? g.score, true);
+    if (!g.passed && !prev?.revealed) this.keepMiss(this.index, g);
     this.updateStats();
     this.revealRows();
+    this.drawExplain();
     void this.save();
     this.focus();
   }
@@ -1202,6 +1361,8 @@ export class DictationPanel {
       case 'check': this.check(); break;
       case 'hint': this.giveHint(); break;
       case 'answer': this.showAnswer(); break;
+      case 'explain': void this.explain(); break;
+      case 'cards': openCards(); break;
       case 'here': this.goToVideoTime(); break;
       case 'load': (this.refs.file as HTMLInputElement).click(); break;
       case 'reset':
@@ -1219,7 +1380,7 @@ export class DictationPanel {
       case 'close': this.close(); break;
       default: return;
     }
-    if (!['collapse', 'close', 'load', 'reset', 'connect'].includes(name)) this.focus();
+    if (!['collapse', 'close', 'load', 'reset', 'connect', 'cards', 'explain'].includes(name)) this.focus();
   }
 
   /** One of the learner's shortcut keys, wherever it was pressed. */
@@ -1253,6 +1414,7 @@ export class DictationPanel {
       [cap(k.loop), 'loop the line'],
       [cap(k.hint), 'hint'],
       [cap(k.answer), 'show answer'],
+      [cap(k.explain), 'explain with AI'],
     ];
     setHTML(this.refs.keygrid, rows.map(([keysHtml, what]) => `<dt>${keysHtml}</dt><dd>${what}</dd>`).join(''));
     setHTML(
@@ -1269,6 +1431,7 @@ export class DictationPanel {
       loop: `Loop segment (${plain(k.loop)})`,
       hint: plain(k.hint),
       answer: plain(k.answer),
+      explain: `Explain with AI (${plain(k.explain)}). Select a phrase in the sentence to ask about it.`,
     };
     this.root.querySelectorAll<HTMLElement>('button[data-act="back"]').forEach((b) => (b.textContent = `−${this.skip}s`));
     this.root.querySelectorAll<HTMLElement>('button[data-act="fwd"]').forEach((b) => (b.textContent = `+${this.skip}s`));

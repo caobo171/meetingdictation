@@ -4,7 +4,7 @@
  * (Alt+H types "˙") never change what it does.
  */
 
-export type KeyAction = 'play' | 'back' | 'forward' | 'prev' | 'next' | 'loop' | 'hint' | 'answer';
+export type KeyAction = 'play' | 'back' | 'forward' | 'prev' | 'next' | 'loop' | 'hint' | 'answer' | 'explain';
 
 export const KEY_ACTIONS: { action: KeyAction; label: string }[] = [
   { action: 'play', label: 'Play / pause' },
@@ -15,6 +15,7 @@ export const KEY_ACTIONS: { action: KeyAction; label: string }[] = [
   { action: 'loop', label: 'Loop the line' },
   { action: 'hint', label: 'Hint' },
   { action: 'answer', label: 'Show answer' },
+  { action: 'explain', label: 'Explain with AI' },
 ];
 
 export type KeyMap = Record<KeyAction, string>;
@@ -28,6 +29,7 @@ export const DEFAULT_KEYS: KeyMap = {
   loop: 'Alt+KeyL',
   hint: 'Alt+KeyH',
   answer: 'Alt+KeyA',
+  explain: 'Alt+KeyE',
 };
 
 const PREF = 'mdKeys';

@@ -1,7 +1,8 @@
 import type { Cue } from '@md/core';
 import { notFound } from 'next/navigation';
 
-import { Dictation } from '@/components/dictation/Dictation';
+import type { Explanation } from '@/components/cards/client';
+import { Dictation, type CardInfo } from '@/components/dictation/Dictation';
 import { db } from '@/lib/db';
 import { loadProgress } from '@/lib/progress';
 import { requireUser } from '@/lib/session';
@@ -19,6 +20,13 @@ export default async function PracticePage({ params }: { params: Promise<{ id: s
   const rec = await db.recording.findFirst({ where: { id, userId: user.id } });
   if (!rec) notFound();
   const progress = await loadProgress(user.id, `web:${rec.id}`);
+  const cardRows = await db.card.findMany({
+    where: { userId: user.id, sourceKey: `web:${rec.id}` },
+    select: { id: true, segIndex: true, focus: true, explanation: true },
+  });
+  const cards: Record<number, CardInfo> = Object.fromEntries(
+    cardRows.map((c) => [c.segIndex, { id: c.id, focus: c.focus, explanation: c.explanation ? (JSON.parse(c.explanation) as Explanation) : null }]),
+  );
 
   return (
     <Dictation
@@ -32,6 +40,7 @@ export default async function PracticePage({ params }: { params: Promise<{ id: s
         cues: JSON.parse(rec.cues) as Cue[],
       }}
       initial={progress ? { fp: progress.fp, index: progress.index, results: progress.results } : null}
+      cards={cards}
     />
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BookOpenIcon,
   Cog6ToothIcon,
   HomeIcon,
   ShieldCheckIcon,
@@ -10,6 +11,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import {
+  BookOpenIcon as BookOpenSolid,
   Cog6ToothIcon as Cog6ToothSolid,
   HomeIcon as HomeSolid,
   ShieldCheckIcon as ShieldCheckSolid,
@@ -27,6 +29,7 @@ const ITEMS = [
   { href: '/app', label: 'Home', icon: HomeIcon, active: HomeSolid },
   { href: '/app/new', label: 'New recording', short: 'New', icon: PlusCircleIcon, active: PlusCircleSolid },
   { href: '/app/recordings', label: 'Recordings', short: 'Library', icon: RectangleStackIcon, active: RectangleStackSolid },
+  { href: '/app/cards', label: 'Flashcards', short: 'Cards', icon: BookOpenIcon, active: BookOpenSolid },
   { href: '/app/extension', label: 'Extension', icon: PuzzlePieceIcon, active: PuzzlePieceSolid },
   { href: '/app/billing', label: 'Plan', icon: SparklesIcon, active: SparklesSolid },
   { href: '/app/settings', label: 'Settings', icon: Cog6ToothIcon, active: Cog6ToothSolid },
@@ -40,7 +43,7 @@ export function AppNav({ variant, admin = false }: { variant: 'side' | 'bottom';
 
   if (variant === 'bottom') {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t bg-background/95 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t bg-background/95 backdrop-blur lg:hidden">
         {ITEMS.map((i) => {
           const on = isActive(i.href);
           const Icon = on ? i.active : i.icon;
@@ -48,7 +51,7 @@ export function AppNav({ variant, admin = false }: { variant: 'side' | 'bottom';
             <Link
               key={i.href}
               href={i.href}
-              className={cn('flex flex-col items-center gap-1 py-2 text-[11px] font-medium', on ? 'text-primary' : 'text-muted-foreground')}
+              className={cn('flex min-w-0 flex-col items-center gap-1 py-2 text-[10.5px] font-medium sm:text-[11px]', on ? 'text-primary' : 'text-muted-foreground')}
             >
               <Icon className="size-5" />
               {i.short ?? i.label}

@@ -298,12 +298,44 @@ export interface BlankPart {
   /** The word to type; empty when the token is only punctuation. */
   word: string;
   post: string;
-  /** "uh", "um", "hi", "then"…: shown, never asked for. */
+  /** "uh", "um", "hi", "then"…, and the word that opens a sentence: shown, never asked for. */
   filler: boolean;
+  /** Shown because it opens a sentence (WELE's rule); `filler` is true too. */
+  given?: boolean;
+}
+
+/** A token that ends a sentence or holds a quote: the next word opens a sentence (WELE: "\n", ".", '"'). */
+const SENTENCE_BREAK = /[.\n"“”]/;
+
+/**
+ * As in WELE's full dictation (wele.web/src/utils/hint.ts), the word that opens each sentence is
+ * shown rather than blanked: the line's first word and the word after ".", a quote or a line
+ * break. Only that one word. A line with a single word to type keeps it as a blank, so there is
+ * always something to write.
+ */
+function giveSentenceOpeners(parts: BlankPart[]): BlankPart[] {
+  if (parts.filter((p) => p.word && !p.filler).length < 2) return parts;
+  let opens = true; // the line itself starts a sentence
+  for (const p of parts) {
+    if (SENTENCE_BREAK.test(p.pre)) opens = true;
+    if (p.word) {
+      if (opens && !p.filler) {
+        p.filler = true;
+        p.given = true;
+      }
+      opens = false;
+    }
+    if (SENTENCE_BREAK.test(p.post)) opens = true;
+  }
+  return parts;
 }
 
 /** Split a transcript line into blanks, one per spoken word, with its punctuation kept visible. */
 export function blankParts(text: string): BlankPart[] {
+  return giveSentenceOpeners(blankTokens(text));
+}
+
+function blankTokens(text: string): BlankPart[] {
   const toks = (text || '')
     .replace(/[’‘]/g, "'")
     .split(/\s+/)
